@@ -1,0 +1,112 @@
+---
+title: "Build a welcome sequence"
+description: "Onboard a new user with templates and follow-up messages using API v1."
+icon: "hand-wave"
+---
+
+<Warning>
+  You're viewing docs for API **v1**, which is in maintenance mode. The [v2 version of this guide](/v2/build-a-welcome-sequence) uses scheduling and multi-channel sends, which remove most of the code below.
+</Warning>
+
+This guide builds a three-message onboarding flow: a welcome email on sign-up, a nudge on day three, and a trial-ending reminder. Because v1 has no scheduling, the follow-ups are sent by a daily job in your own infrastructure.
+
+## Setup
+
+```python
+import os, requests
+
+API = "https://api.pingme.dev/v1"
+HEADERS = {"Authorization": f"Bearer {os.environ['PINGME_API_KEY']}"}
+```
+
+<Steps>
+  <Step title="Create the templates">
+    Endpoint: [Create a template](/v1/api-reference/templates/create-a-template)
+
+    ```python
+    templates = {}
+    for spec in [
+        {"name": "welcome", "channels": ["email"],
+         "subject": "Welcome to {{workspace}}, {{first_name}}!",
+         "body": "Hi {{first_name}}, your workspace {{workspace}} is ready."},
+        {"name": "day3_nudge", "channels": ["email"],
+         "subject": "Create your first project",
+         "body": "{{first_name}}, most teams create a project on day one."},
+        {"name": "trial_ending", "channels": ["email"],
+         "subject": "Your trial ends in {{days_left}} days",
+         "body": "Keep {{workspace}} running after {{trial_end_date}} by choosing a plan."},
+    ]:
+        t = requests.post(f"{API}/templates", headers=HEADERS, json=spec).json()
+        templates[t["name"]] = t["id"]
+    ```
+  </Step>
+
+  <Step title="Create the recipient and send the welcome message">
+    Endpoints: [Create a recipient](/v1/api-reference/recipients/create-a-recipient), [Send a message](/v1/api-reference/messages/send-a-message)
+
+    ```python
+    def on_user_signed_up(user):
+        recipient = requests.post(f"{API}/recipients", headers=HEADERS, json={
+            "external_id": user.id,
+            "email": user.email,
+            "timezone": user.timezone,
+        }).json()
+        user.pingme_recipient_id = recipient["id"]
+        user.save()
+
+        requests.post(f"{API}/messages", headers=HEADERS, json={
+            "recipient_id": recipient["id"],
+            "template_id": templates["welcome"],
+            "channel": "email",
+            "data": {"first_name": user.first_name, "workspace": user.workspace_name},
+        })
+    ```
+
+    <Note>
+      v1 has no idempotency keys. If your sign-up handler can be retried, record that the welcome message was sent before calling PingMe.
+    </Note>
+  </Step>
+
+  <Step title="Send follow-ups from a daily job">
+    Run this once a day. It sends the nudge to users who signed up three days ago and haven't created a project, and the reminder to users whose trial ends in three days.
+
+    ```python
+    from datetime import date, timedelta
+
+    def daily_onboarding_job():
+        today = date.today()
+        for user in users_signed_up_on(today - timedelta(days=3)):
+            if not user.has_projects:
+                requests.post(f"{API}/messages", headers=HEADERS, json={
+                    "recipient_id": user.pingme_recipient_id,
+                    "template_id": templates["day3_nudge"],
+                    "channel": "email",
+                    "data": {"first_name": user.first_name},
+                })
+        for user in users_with_trial_ending_on(today + timedelta(days=3)):
+            requests.post(f"{API}/messages", headers=HEADERS, json={
+                "recipient_id": user.pingme_recipient_id,
+                "template_id": templates["trial_ending"],
+                "channel": "email",
+                "data": {"workspace": user.workspace_name, "days_left": 3,
+                         "trial_end_date": user.trial_ends_at.strftime("%B %d")},
+            })
+    ```
+  </Step>
+
+  <Step title="Honor opt-outs">
+    v1 has a single `unsubscribed` flag per recipient. Setting it to `true` skips all future sends.
+
+    Endpoint: [Update a recipient](/v1/api-reference/recipients/update-a-recipient)
+
+    ```python
+    def on_user_unsubscribed(user):
+        requests.patch(f"{API}/recipients/{user.pingme_recipient_id}",
+                       headers=HEADERS, json={"unsubscribed": True})
+    ```
+  </Step>
+</Steps>
+
+## Tracking results
+
+Use [Get message deliveries](/v1/api-reference/messages/get-message-deliveries) or subscribe to [webhooks](/v1/webhooks) for `message.delivered` and `message.failed`.

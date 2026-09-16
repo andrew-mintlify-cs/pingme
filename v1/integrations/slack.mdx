@@ -1,0 +1,23 @@
+---
+title: "Slack"
+description: "Slack is available as a channel in API v2. Here's how v1 integrations can add it."
+icon: "slack"
+---
+
+<Warning>
+  Slack is a **v2-only** channel. API v1 supports `email`, `sms`, and `push`.
+</Warning>
+
+## Using Slack from a v1 integration
+
+You don't need to migrate your whole integration to send to Slack. Both API versions share the same recipients, templates, and API keys, so you can:
+
+1. Connect Slack in **Settings → Channels → Slack** (works for the whole workspace).
+2. Create a recipient that represents a Slack channel and send to it using the **v2** `POST /messages` endpoint, following the [v2 Slack guide](/v2/integrations/slack).
+3. Keep your existing v1 calls for email, SMS, and push unchanged.
+
+The only difference in your code is the base URL (`/v2` instead of `/v1`) and the `channels` array on the Slack sends.
+
+## Planning a full migration?
+
+The [v1 quickstart](/v1/quickstart#differences-from-v2) has a side-by-side comparison, and the [Changelog](/changelog) lists the migration timeline.

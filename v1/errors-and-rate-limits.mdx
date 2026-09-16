@@ -1,0 +1,105 @@
+---
+title: "Errors and rate limits"
+description: "How PingMe reports errors, what each error type means, and how to stay within rate limits."
+icon: "triangle-exclamation"
+---
+
+<Warning>
+  You're viewing docs for API **v1**, which is in maintenance mode. New integrations should use [v2](/v2/quickstart), which adds multi-channel sends, scheduling, idempotency keys, and per-channel preferences.
+</Warning>
+
+PingMe uses conventional HTTP status codes and returns a consistent JSON error body so you can handle failures the same way on every endpoint.
+
+## Error format
+
+Every non-2xx response has this shape:
+
+```json
+{
+  "error": {
+    "type": "validation_error",
+    "code": "invalid_channel",
+    "message": "'fax' is not a supported channel. Supported: email, sms, push.",
+    "param": "channels",
+    "doc_url": "https://docs.pingme.dev/v1/errors-and-rate-limits#validation-error"
+  }
+}
+```
+
+| Field | Description |
+| :-- | :-- |
+| `type` | The category of error. Branch on this in your code. |
+| `code` | A stable, specific identifier. Safe to match on; new codes may be added but existing ones don't change meaning. |
+| `message` | Human-readable explanation. Wording may change — don't parse it. |
+| `param` | For validation errors, the request field at fault. Otherwise `null`. |
+| `doc_url` | A link to the relevant section of these docs. |
+
+## Error types
+
+### `validation_error` (400)
+
+The request body or parameters are malformed. Fix the request; retrying without changes will fail again. Common codes: `missing_required_field`, `invalid_channel`, `invalid_phone_number`, `template_and_content_both_set`.
+
+### `authentication_error` (401)
+
+The API key is missing, malformed, or revoked. See [API keys](/v1/api-keys#troubleshooting).
+
+### `not_found` (404)
+
+No resource with that ID exists in this workspace and mode. Remember that test and live data are isolated.
+
+### `conflict` (409)
+
+The request is valid but the resource is in a state that doesn't allow it.
+
+### `rate_limited` (429)
+
+You've exceeded your per-minute request budget. Wait for the number of seconds in the `Retry-After` header, then retry. See [Rate limits](#rate-limits).
+
+### `server_error` (500, 503)
+
+Something failed on PingMe's side. These are safe to retry with backoff. If a `503` persists, check [status.pingme.dev](https://status.pingme.dev).
+
+## Rate limits
+
+Rate limits are applied per workspace, per minute, across all keys in the same mode.
+
+| Plan | Requests per minute |
+| :-- | :-- |
+| Starter | 30 |
+| Growth | 300 |
+| Enterprise | Custom |
+
+Every response includes the current window in headers:
+
+```http
+RateLimit-Limit: 300
+RateLimit-Remaining: 287
+RateLimit-Reset: 41
+```
+
+When you exceed the limit, the response is `429` with a `Retry-After` header:
+
+```json
+{
+  "error": {
+    "type": "rate_limited",
+    "code": "rate_limit_exceeded",
+    "message": "You have exceeded 300 requests per minute. Retry after 12 seconds.",
+    "param": null,
+    "doc_url": "https://docs.pingme.dev/v1/errors-and-rate-limits#rate-limits"
+  }
+}
+```
+
+<Tip>
+  Sending to many recipients? For bulk campaigns, spread sends over time from your own job queue rather than bursting.
+</Tip>
+
+## Retrying safely
+
+Retry `429`, `500`, and `503` with exponential backoff and jitter. Never retry `400`, `401`, `404`, or `409` without changing the request.
+
+<Warning>
+  v1 has no idempotency mechanism. If a `POST /messages` request times out, you cannot know whether it was processed, and retrying may send a duplicate. Record your own send attempts, or upgrade to [v2](/v2/errors-and-rate-limits#retrying-safely), which supports the `Idempotency-Key` header.
+</Warning>

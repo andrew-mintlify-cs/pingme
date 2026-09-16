@@ -1,0 +1,92 @@
+---
+title: "API keys"
+description: "Create, scope, rotate, and revoke PingMe API keys, and understand the difference between test and live modes."
+icon: "key"
+---
+
+<Warning>
+  You're viewing docs for API **v1**, which is in maintenance mode. New integrations should use [v2](/v2/quickstart), which adds multi-channel sends, scheduling, idempotency keys, and per-channel preferences.
+</Warning>
+
+Every request to the PingMe API is authenticated with a bearer token:
+
+```http
+Authorization: Bearer pm_live_51Kx9…
+```
+
+Keys belong to a **workspace**. Anyone with a key can act on that workspace's recipients, templates, and messages, so treat keys like passwords.
+
+## Test keys vs live keys
+
+| | Test key (`pm_test_…`) | Live key (`pm_live_…`) |
+| :-- | :-- | :-- |
+| Delivers to real recipients | No | Yes |
+| Appears in dashboard logs | Yes, tagged **Test** | Yes |
+| Webhook events fire | Yes, to endpoints created with a test key | Yes |
+| Counts toward plan volume | No | Yes |
+| Rate limit | Same as live | Per plan |
+
+Test and live modes are fully separate: a recipient created with a test key is not visible to live keys, and vice versa. This lets you run the same code in staging and production by swapping one environment variable.
+
+<Warning>
+  Never embed a live key in a mobile app, browser JavaScript, or a public repository. Keys are meant for server-side code. If a key is exposed, [revoke it](#revoke-a-key) immediately — revocation takes effect within seconds.
+</Warning>
+
+## Create a key
+
+<Steps>
+  <Step title="Open API keys">
+    In the dashboard, go to **Settings → API keys**. You need the Owner, Admin, or Developer role.
+  </Step>
+  <Step title="Choose a mode and name">
+    Pick **Test** or **Live** and give the key a name that says where it's used, such as `prod-api-server` or `ci-pipeline`. Names appear in audit logs.
+  </Step>
+  <Step title="Copy the key once">
+    The full key is shown a single time. Store it in your secrets manager. Afterwards the dashboard only shows the prefix and last four characters.
+  </Step>
+</Steps>
+
+## Rotate a key
+
+Rotation without downtime is a three-step process:
+
+1. Create a new key with the same mode.
+2. Deploy the new key to your services and confirm requests succeed (check **Logs** filtered by key name).
+3. Revoke the old key.
+
+PingMe recommends rotating live keys at least every 12 months and whenever a team member with key access leaves.
+
+## Revoke a key
+
+Click **Revoke** next to the key in **Settings → API keys**. Requests using a revoked key receive:
+
+```json
+{
+  "error": {
+    "type": "authentication_error",
+    "code": "invalid_api_key",
+    "message": "The API key provided is invalid or has been revoked.",
+    "doc_url": "https://docs.pingme.dev/v1/api-keys"
+  }
+}
+```
+
+Revocation cannot be undone. Requests in flight when a key is revoked may still complete.
+
+## Keys in the API playground
+
+The [API reference](/v1/api-reference/messages/send-a-message) playground stores the key you enter in your browser only. Use a test key there; nothing you send from the playground with a test key reaches a real person.
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="401 invalid_api_key with a key that looks correct">
+    Check for a trailing newline or whitespace copied along with the key, and confirm the header is `Authorization: Bearer <key>` — not `X-API-Key`. Also confirm you're calling `/v2` with a key from the same workspace.
+  </Accordion>
+  <Accordion title="404 for a recipient I just created">
+    You probably created it with a test key and are reading it with a live key (or the reverse). Test and live data are isolated.
+  </Accordion>
+  <Accordion title="I need a key that can only read">
+    Read-only keys are on the roadmap. Today, use the Viewer dashboard role for humans who need read access, and keep API keys server-side.
+  </Accordion>
+</AccordionGroup>

@@ -1,0 +1,127 @@
+---
+title: "Quickstart"
+description: "Send your first PingMe notification with API v1 using a test API key."
+icon: "rocket"
+---
+
+<Warning>
+  You're viewing docs for API **v1**, which is in maintenance mode. New integrations should use [v2](/v2/quickstart), which adds multi-channel sends, scheduling, idempotency keys, and per-channel preferences.
+</Warning>
+
+By the end of this page you'll have created a recipient, sent them a message, and confirmed delivery against the sandbox.
+
+## Prerequisites
+
+- A PingMe account and a test API key (`pm_test_…`) from **Settings → API keys**. See [API keys](/v1/api-keys).
+- `curl` or Python 3.9+.
+
+```bash
+export PINGME_API_KEY="pm_test_your_key_here"
+```
+
+## Send your first message
+
+<Steps>
+  <Step title="Create a recipient">
+    <CodeGroup>
+    ```bash curl
+    curl https://api.pingme.dev/v1/recipients \
+      -H "Authorization: Bearer $PINGME_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "external_id": "user_8841",
+        "email": "priya@acme-analytics.example",
+        "locale": "en-US",
+        "timezone": "America/Los_Angeles"
+      }'
+    ```
+
+    ```python Python
+    import os, requests
+
+    API = "https://api.pingme.dev/v1"
+    HEADERS = {"Authorization": f"Bearer {os.environ['PINGME_API_KEY']}"}
+
+    recipient = requests.post(f"{API}/recipients", headers=HEADERS, json={
+        "external_id": "user_8841",
+        "email": "priya@acme-analytics.example",
+        "locale": "en-US",
+        "timezone": "America/Los_Angeles",
+    }).json()
+    ```
+    </CodeGroup>
+  </Step>
+
+  <Step title="Send a message">
+    In v1 each message goes to exactly one `channel`. To reach a recipient on two channels, send two messages.
+
+    <CodeGroup>
+    ```bash curl
+    curl https://api.pingme.dev/v1/messages \
+      -H "Authorization: Bearer $PINGME_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "recipient_id": "rcp_01J8X4K2M9",
+        "channel": "email",
+        "content": {
+          "subject": "Hello from PingMe",
+          "body": "If you can read this, your integration works."
+        }
+      }'
+    ```
+
+    ```python Python
+    message = requests.post(f"{API}/messages", headers=HEADERS, json={
+        "recipient_id": recipient["id"],
+        "channel": "email",
+        "content": {
+            "subject": "Hello from PingMe",
+            "body": "If you can read this, your integration works.",
+        },
+    }).json()
+    ```
+    </CodeGroup>
+
+    You'll receive a `202 Accepted` with `status: queued`.
+  </Step>
+
+  <Step title="Check delivery">
+    <CodeGroup>
+    ```bash curl
+    curl https://api.pingme.dev/v1/messages/msg_01J8X5A7QZ/deliveries \
+      -H "Authorization: Bearer $PINGME_API_KEY"
+    ```
+
+    ```python Python
+    deliveries = requests.get(
+        f"{API}/messages/{message['id']}/deliveries", headers=HEADERS
+    ).json()["data"]
+    print(deliveries[0]["status"])  # delivered
+    ```
+    </CodeGroup>
+  </Step>
+</Steps>
+
+## Differences from v2
+
+| | v1 | v2 |
+| :-- | :-- | :-- |
+| Channels per message | One (`channel`) | Many (`channels`) |
+| Channels available | email, sms, push | email, sms, push, in_app, slack |
+| Scheduling | Not supported | `scheduled_at` + cancel endpoint |
+| Duplicate protection | None | `Idempotency-Key` header |
+| Opt-outs | Single `unsubscribed` flag | Per-channel `preferences` |
+| Webhook signature | `X-PingMe-Signature` (body HMAC) | `PingMe-Signature` (timestamped HMAC) + `PingMe-Event-Id` |
+
+See the [Changelog](/changelog) for the migration timeline.
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Build a welcome sequence" icon="hand-wave" href="/v1/build-a-welcome-sequence">
+    Templates and follow-ups on v1.
+  </Card>
+  <Card title="Set up webhooks" icon="webhook" href="/v1/webhooks">
+    Delivery events and v1 signature verification.
+  </Card>
+</CardGroup>

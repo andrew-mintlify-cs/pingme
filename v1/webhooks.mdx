@@ -1,0 +1,62 @@
+---
+title: "Webhooks"
+description: "Receive delivery events from PingMe API v1 and verify the X-PingMe-Signature header."
+icon: "webhook"
+---
+
+<Warning>
+  You're viewing docs for API **v1**. v1 webhooks use a simpler signature scheme without replay protection and retry for only one hour. See the [v2 webhooks guide](/v2/webhooks) for the current scheme.
+</Warning>
+
+Register an HTTPS URL and PingMe posts a signed request each time a `message.sent`, `message.delivered`, or `message.failed` event occurs. Payloads are documented in the [Webhook events reference](/v1/webhook-events/message-delivered).
+
+## Register an endpoint
+
+Endpoint: [Create a webhook endpoint](/v1/api-reference/webhook-endpoints/create-a-webhook-endpoint)
+
+```python
+endpoint = requests.post(f"{API}/webhooks", headers=HEADERS, json={
+    "url": "https://api.acme-analytics.example/webhooks/pingme",
+    "events": ["message.delivered", "message.failed"],
+}).json()
+print(endpoint["secret"])  # shown once
+```
+
+## Verify the signature
+
+v1 sends a single header, `X-PingMe-Signature`, containing a hex HMAC-SHA256 of the **raw body** using your endpoint secret.
+
+```python
+import hmac, hashlib
+from flask import Flask, request, abort
+
+app = Flask(__name__)
+SECRET = os.environ["PINGME_WEBHOOK_SECRET"].encode()
+
+@app.post("/webhooks/pingme")
+def pingme_webhook():
+    expected = hmac.new(SECRET, request.get_data(), hashlib.sha256).hexdigest()
+    if not hmac.compare_digest(expected, request.headers.get("X-PingMe-Signature", "")):
+        abort(401)
+    event = request.get_json()
+    handle(event)
+    return "", 200
+```
+
+<Note>
+  v1 signatures are not timestamped, so a captured request could be replayed. If this matters for your application, upgrade to v2, whose `PingMe-Signature` header includes a timestamp you can bound.
+</Note>
+
+## Retries
+
+Non-`2xx` responses are retried up to **3 times over one hour**. v1 does not send a `PingMe-Event-Id` header; deduplicate on `event.id` in the body instead.
+
+## Events
+
+| Event | Fires when |
+| :-- | :-- |
+| `message.sent` | The message was handed to the provider |
+| `message.delivered` | The provider confirmed delivery |
+| `message.failed` | All retries failed |
+
+The `recipient.unsubscribed` event is available in v2 only.
