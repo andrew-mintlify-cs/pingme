@@ -1,0 +1,155 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "theme": "mint",
+  "name": "PingMe",
+  "description": "Developer documentation for PingMe, the notifications platform for product teams.",
+  "colors": {
+    "primary": "#0F766E",
+    "light": "#2DD4BF",
+    "dark": "#0F766E"
+  },
+  "favicon": "/favicon.svg",
+  "logo": {
+    "light": "/logo/light.svg",
+    "dark": "/logo/dark.svg",
+    "href": "https://docs.pingme.dev"
+  },
+  "appearance": {
+    "default": "system"
+  },
+  "api": {
+    "playground": {
+      "display": "interactive"
+    },
+    "examples": {
+      "languages": ["curl", "python"],
+      "defaults": "required"
+    }
+  },
+  "navigation": {
+    "global": {
+      "anchors": [
+        { "anchor": "Changelog", "icon": "list", "href": "/changelog" },
+        { "anchor": "Status", "icon": "signal", "href": "https://status.pingme.dev" },
+        { "anchor": "Support", "icon": "life-ring", "href": "mailto:support@pingme.dev" },
+        { "anchor": "GitHub", "icon": "github", "href": "https://github.com/pingme-dev" }
+      ]
+    },
+    "tabs": [
+      {
+        "tab": "Product",
+        "icon": "rocket",
+        "groups": [
+          {
+            "group": "Overview",
+            "pages": ["index", "product/plans-security-faq"]
+          }
+        ]
+      },
+      {
+        "tab": "Learn",
+        "icon": "graduation-cap",
+        "anchors": [
+          {
+            "anchor": "Concepts",
+            "icon": "lightbulb",
+            "pages": ["learn/how-notification-platforms-work", "learn/glossary"]
+          },
+          {
+            "anchor": "Learn more",
+            "icon": "book-open",
+            "pages": ["learn/resources"]
+          }
+        ]
+      },
+      {
+        "tab": "Developers",
+        "icon": "code",
+        "versions": [
+          {
+            "version": "v2",
+            "tag": "Latest",
+            "default": true,
+            "groups": [
+              {
+                "group": "Get started",
+                "pages": ["v2/quickstart", "v2/api-keys", "v2/errors-and-rate-limits"]
+              },
+              {
+                "group": "Guides",
+                "pages": ["v2/build-a-welcome-sequence", "v2/webhooks"]
+              },
+              {
+                "group": "Integrations",
+                "pages": ["v2/integrations/slack"]
+              },
+              {
+                "group": "API reference",
+                "openapi": {
+                  "source": "openapi/core-v2.yaml",
+                  "directory": "v2/api-reference"
+                }
+              },
+              {
+                "group": "Webhook events",
+                "pages": [
+                  "v2/webhook-events/message-sent",
+                  "v2/webhook-events/message-delivered",
+                  "v2/webhook-events/message-failed",
+                  "v2/webhook-events/recipient-unsubscribed"
+                ]
+              }
+            ]
+          },
+          {
+            "version": "v1",
+            "tag": "Legacy",
+            "groups": [
+              {
+                "group": "Get started",
+                "pages": ["v1/quickstart", "v1/api-keys", "v1/errors-and-rate-limits"]
+              },
+              {
+                "group": "Guides",
+                "pages": ["v1/build-a-welcome-sequence", "v1/webhooks"]
+              },
+              {
+                "group": "Integrations",
+                "pages": ["v1/integrations/slack"]
+              },
+              {
+                "group": "API reference",
+                "openapi": {
+                  "source": "openapi/core-v1.yaml",
+                  "directory": "v1/api-reference"
+                }
+              },
+              {
+                "group": "Webhook events",
+                "pages": [
+                  "v1/webhook-events/message-sent",
+                  "v1/webhook-events/message-delivered",
+                  "v1/webhook-events/message-failed"
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "navbar": {
+    "links": [{ "label": "Sign in", "href": "https://app.pingme.dev/login" }],
+    "primary": {
+      "type": "button",
+      "label": "Get an API key",
+      "href": "https://app.pingme.dev/signup"
+    }
+  },
+  "footer": {
+    "socials": {
+      "github": "https://github.com/pingme-dev",
+      "linkedin": "https://linkedin.com/company/pingme-dev"
+    }
+  }
+}

@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 300" font-family="Inter, -apple-system, Segoe UI, Helvetica, Arial, sans-serif">
+  <defs><marker id="a" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#0F766E"/></marker></defs>
+  <rect x="20" y="105" width="180" height="90" rx="12" fill="#F1F5F9" stroke="#0F766E" stroke-width="2"/>
+  <text x="110" y="143" text-anchor="middle" font-size="16" font-weight="700" fill="#0F172A">Your application</text>
+  <text x="110" y="168" text-anchor="middle" font-size="12" fill="#475569">POST /v2/messages</text>
+  <rect x="330" y="80" width="240" height="140" rx="14" fill="#0F766E"/>
+  <text x="450" y="120" text-anchor="middle" font-size="18" font-weight="700" fill="#fff">PingMe</text>
+  <text x="450" y="146" text-anchor="middle" font-size="12" fill="#CCFBF1">Templates · Preferences</text>
+  <text x="450" y="166" text-anchor="middle" font-size="12" fill="#CCFBF1">Routing · Retries · Tracking</text>
+  <text x="450" y="192" text-anchor="middle" font-size="12" fill="#CCFBF1">Webhooks</text>
+  <g font-size="13" fill="#0F172A" font-weight="600">
+    <rect x="700" y="30" width="170" height="38" rx="8" fill="#F1F5F9" stroke="#94A3B8"/><text x="785" y="55" text-anchor="middle">Email</text>
+    <rect x="700" y="80" width="170" height="38" rx="8" fill="#F1F5F9" stroke="#94A3B8"/><text x="785" y="105" text-anchor="middle">SMS</text>
+    <rect x="700" y="130" width="170" height="38" rx="8" fill="#F1F5F9" stroke="#94A3B8"/><text x="785" y="155" text-anchor="middle">Push (APNs / FCM)</text>
+    <rect x="700" y="180" width="170" height="38" rx="8" fill="#F1F5F9" stroke="#94A3B8"/><text x="785" y="205" text-anchor="middle">In-app</text>
+    <rect x="700" y="230" width="170" height="38" rx="8" fill="#F1F5F9" stroke="#94A3B8"/><text x="785" y="255" text-anchor="middle">Slack</text>
+  </g>
+  <line x1="200" y1="135" x2="322" y2="135" stroke="#0F766E" stroke-width="2.5" marker-end="url(#a)"/>
+  <text x="261" y="126" text-anchor="middle" font-size="11" fill="#0F766E">send</text>
+  <line x1="322" y1="175" x2="200" y2="175" stroke="#0F766E" stroke-width="2.5" marker-end="url(#a)" stroke-dasharray="6 4"/>
+  <text x="261" y="195" text-anchor="middle" font-size="11" fill="#0F766E">webhook events</text>
+  <g stroke="#0F766E" stroke-width="2" fill="none" marker-end="url(#a)">
+    <path d="M570,120 C640,120 640,49 692,49"/><path d="M570,135 C640,135 640,99 692,99"/><path d="M570,150 C640,150 640,149 692,149"/><path d="M570,165 C640,165 640,199 692,199"/><path d="M570,180 C640,180 640,249 692,249"/>
+  </g>
+</svg>

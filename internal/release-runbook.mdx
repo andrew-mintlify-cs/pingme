@@ -1,0 +1,52 @@
+---
+title: "Release runbook"
+description: "Internal — how the PingMe engineering team ships API and dashboard releases."
+icon: "clipboard-list"
+hidden: true
+---
+
+<Warning>
+  **Internal page.** This page is not linked from navigation and is intended for PingMe employees. Do not share the URL externally.
+</Warning>
+
+## Release cadence
+
+- **API:** deploys continuously; breaking changes only in a new major version, announced 90 days ahead in the [Changelog](/changelog).
+- **Dashboard:** weekly release train, Tuesdays 10:00 AM Pacific. Freeze from Friday noon.
+- **Docs:** merged to `main` deploys immediately via Mintlify. Preview deployments are attached to every PR.
+
+## Roles
+
+| Role | Responsibility | Rotation |
+| :-- | :-- | :-- |
+| Release captain | Runs the checklist below, owns go/no-go | Weekly, from #eng-oncall roster |
+| On-call engineer | Watches error budgets for 24 hours after release | Follows PagerDuty schedule |
+| Docs owner | Confirms changelog entry and any affected guides are merged before release | Tech writing team |
+
+## Checklist
+
+<Steps>
+  <Step title="T-2 days: freeze and triage">
+    Label the release in Linear. Anything not merged by Friday noon moves to next week. Confirm the changelog entry is drafted and reviewed by product marketing.
+  </Step>
+  <Step title="T-1 day: staging soak">
+    Deploy to staging. Run the API contract tests against both `/v1` and `/v2`. Send the smoke-test message set (one per channel) from the `pm_test_` staging key and confirm all deliveries reach `delivered` in the sandbox.
+  </Step>
+  <Step title="Release day: canary">
+    Deploy to 5% of API traffic for 30 minutes. Abort if 5xx rate exceeds 0.1% or p95 latency on `POST /messages` exceeds 250 ms.
+  </Step>
+  <Step title="Release day: full rollout">
+    Promote to 100%. Post in #announcements with the changelog link. Merge the docs PR if it was held.
+  </Step>
+  <Step title="T+1 day: review">
+    On-call engineer posts a short summary in #eng-releases: incidents, rollbacks, customer reports. Anything notable becomes a retro item.
+  </Step>
+</Steps>
+
+## Rollback
+
+`deployctl rollback api --to <previous-sha>` reverts the API in under two minutes. Docs roll back from the Mintlify dashboard under **Deployments → Rollbacks**. Dashboard rollbacks require the release captain and one other engineer.
+
+## Communicating incidents
+
+Customer-visible incidents go on [status.pingme.dev](https://status.pingme.dev) within 15 minutes of detection, with updates at least every 30 minutes until resolved. The support team is notified in #support-escalations before the status page is updated so they aren't surprised by tickets.

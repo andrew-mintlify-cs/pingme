@@ -1,0 +1,67 @@
+---
+title: "Pricing model (internal)"
+description: "Internal — how PingMe usage-based pricing is computed, for sales and support reference."
+icon: "coins"
+hidden: true
+---
+
+<Warning>
+  **Internal page.** These are internal rate-card details for sales and support. Public pricing lives on [Plans, security & FAQ](/product/plans-security-faq).
+</Warning>
+
+PingMe bills two usage dimensions on top of a monthly platform fee: **API requests** and **messages delivered, priced by channel**. Test-mode traffic is never billed.
+
+## Platform fee and included usage
+
+| Plan | Platform fee | Included messages | Included API requests | Rate limit |
+| :-- | :-- | :-- | :-- | :-- |
+| Starter | $49 / mo | 10,000 | 500,000 | 60 req/min |
+| Growth | $399 / mo | 250,000 | 10,000,000 | 600 req/min |
+| Enterprise | Custom (annual) | Custom | Custom | Custom |
+
+Included messages are counted across all channels combined. Overage is billed monthly in arrears.
+
+## Per-message overage by channel
+
+| Channel | Starter | Growth | Enterprise floor |
+| :-- | :-- | :-- | :-- |
+| Email | $0.0010 | $0.0008 | $0.0005 |
+| In-app | $0.0005 | $0.0004 | $0.0002 |
+| Push (APNs / FCM) | $0.0005 | $0.0004 | $0.0002 |
+| Slack | $0.0020 | $0.0015 | $0.0010 |
+| SMS — US / Canada | $0.0090 | $0.0080 | $0.0070 |
+| SMS — Rest of world | Pass-through carrier rate + $0.0020 | Pass-through + $0.0015 | Pass-through + $0.0010 |
+
+A message sent on two channels counts as two deliveries. Deliveries with status `skipped` (preferences, quiet hours) are **not** billed. Deliveries with status `failed` are billed for SMS only, because carriers charge for attempts.
+
+## API request overage
+
+| Endpoint group | Price per 1,000 requests over the included amount |
+| :-- | :-- |
+| `POST /messages` | $0.20 |
+| `GET /messages/*` (reads, deliveries) | $0.05 |
+| Recipients and templates (all methods) | $0.05 |
+| Webhook endpoint management | Free |
+
+Requests that return `429` or `5xx` are not counted.
+
+## Worked example
+
+A Growth customer in one month:
+
+- 310,000 messages: 200,000 email, 90,000 push, 20,000 SMS (US)
+- 11,200,000 API requests, of which 9,000,000 are `POST /messages`
+
+| Line | Calculation | Amount |
+| :-- | :-- | :-- |
+| Platform fee | | $399.00 |
+| Message overage | 60,000 over included; applied to the most expensive channels first: 20,000 SMS × $0.008 + 40,000 push × $0.0004 | $176.00 |
+| API request overage | 1,200,000 over included; assume proportional split: 964,000 sends × $0.20/1k + 236,000 reads × $0.05/1k | $204.60 |
+| **Total** | | **$779.60** |
+
+## Discounts and guardrails
+
+- Annual prepay: 15% off platform fee, overage rates unchanged.
+- Enterprise deals under $25,000 ARR require Finance approval.
+- Never quote below the Enterprise floor without VP Sales sign-off.
+- Overage rates are recalculated quarterly against carrier costs; the sales team is notified two weeks before changes.

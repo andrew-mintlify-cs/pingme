@@ -1,0 +1,58 @@
+---
+title: "Changelog"
+description: "Product and API updates, newest first. Subscribe to the RSS feed to get these in your reader."
+rss: true
+---
+
+<Update label="September 9, 2026" description="API v2" tags={["API", "Breaking change"]}>
+  ## API v2 is generally available
+
+  v2 is now the default version in these docs and the recommended target for new integrations.
+
+  **New**
+  - Multi-channel sends: `channels` is an array, one request per message instead of one per channel
+  - Scheduled sends with `scheduled_at` and a new `POST /messages/{id}/cancel` endpoint
+  - `Idempotency-Key` header on `POST /messages`
+  - Per-channel recipient `preferences`, replacing the single `unsubscribed` flag
+  - Two new channels: `in_app` and `slack`
+  - `recipient.unsubscribed` webhook event
+  - Timestamped webhook signatures (`PingMe-Signature`) and `PingMe-Event-Id` for deduplication
+
+  **Migration** — v1 remains fully supported until **September 30, 2027**. See the [v1 quickstart](/v1/quickstart#differences-from-v2) for a side-by-side comparison. The dashboard now shows which of your API keys are still calling v1.
+</Update>
+
+<Update label="July 22, 2026" description="Channels" tags={["Channels", "Integrations"]}>
+  ## Slack channel
+
+  Connect a Slack workspace under **Settings → Channels** and send to Slack channels through the same `POST /messages` call you already use. Available on API v2. See the [Slack integration guide](/v2/integrations/slack).
+</Update>
+
+<Update label="May 14, 2026" description="v2 beta" tags={["API", "Beta"]}>
+  ## Scheduled sends (beta)
+
+  Pass `scheduled_at` on `POST /messages` (v2 beta) to deliver up to 30 days in the future, in the recipient's time zone. Scheduled messages can be cancelled until they send. Thanks to the 40 beta customers who shaped the retry and quiet-hours behavior.
+</Update>
+
+<Update label="March 3, 2026" description="Dashboard" tags={["Dashboard"]}>
+  ## Webhook delivery viewer and replay
+
+  **Webhooks → Deliveries** now shows every attempt PingMe made to your endpoints, the response you returned, and a **Replay** button for any event. Endpoints that fail repeatedly are disabled automatically and admins are notified by email.
+</Update>
+
+<Update label="January 20, 2026" description="Deprecation" tags={["Deprecation"]}>
+  ## `Message.channel` field deprecated in favor of `channels`
+
+  In preparation for v2, message objects returned by v1 now include both `channel` (string) and `channels` (array with one element). `channel` will be removed from v2 responses; v1 is unchanged. No action is required for v1 integrations.
+</Update>
+
+<Update label="October 8, 2025" description="Rate limits" tags={["API"]}>
+  ## Rate-limit headers
+
+  All responses now include `RateLimit-Limit`, `RateLimit-Remaining`, and `RateLimit-Reset` headers so you can back off before hitting `429`. Limits themselves are unchanged. See [Errors and rate limits](/v2/errors-and-rate-limits#rate-limits).
+</Update>
+
+<Update label="June 2, 2025" description="Launch" tags={["Launch"]}>
+  ## PingMe API v1
+
+  Initial public release: recipients, templates, single-channel messages on email, SMS, and push, per-channel delivery records, and webhooks for `message.sent`, `message.delivered`, and `message.failed`.
+</Update>
