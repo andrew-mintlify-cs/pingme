@@ -12,7 +12,7 @@
   "logo": {
     "light": "/logo/light.svg",
     "dark": "/logo/dark.svg",
-    "href": "https://docs.pingme.dev"
+    "href": "https://pingme-ed4ebff6.mintlify.site/"
   },
   "appearance": {
     "default": "system"
@@ -32,7 +32,7 @@
         { "anchor": "Changelog", "icon": "list", "href": "/changelog" },
         { "anchor": "Status", "icon": "signal", "href": "https://status.pingme.dev" },
         { "anchor": "Support", "icon": "life-ring", "href": "mailto:support@pingme.dev" },
-        { "anchor": "GitHub", "icon": "github", "href": "https://github.com/pingme-dev" }
+        { "anchor": "GitHub", "icon": "github", "href": "https://github.com/andrew-mintlify-cs/pingme" }
       ]
     },
     "tabs": [
@@ -148,7 +148,7 @@
   },
   "footer": {
     "socials": {
-      "github": "https://github.com/pingme-dev",
+      "github": "https://github.com/andrew-mintlify-cs/pingme",
       "linkedin": "https://linkedin.com/company/pingme-dev"
     }
   }
