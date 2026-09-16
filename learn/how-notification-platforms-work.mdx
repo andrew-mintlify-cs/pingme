@@ -1,0 +1,75 @@
+---
+title: "How notification platforms work"
+description: "A plain-language explanation of channels, templates, preferences, and delivery — and why teams stop building this themselves."
+icon: "lightbulb"
+---
+
+You don't need to write code to understand PingMe. This guide explains the moving parts using the same vocabulary you'll see in the rest of the docs.
+
+## The problem PingMe solves
+
+Every product eventually needs to tell its users things: *your account is ready*, *your code is 482913*, *your trial ends in 3 days*, *someone commented on your document*. At first that's a single "send email" function. Then someone asks for SMS. Then mobile push. Then a user complains they got the same alert three times on three channels. Then legal asks about unsubscribe handling.
+
+Most engineering teams end up building a small notifications system by accident. PingMe is that system, built once and maintained for you.
+
+## The five moving parts
+
+<Steps>
+  <Step title="Recipients">
+    A **recipient** is a person you might send to. PingMe stores their contact details (email, phone, device tokens), their locale and time zone, and their **preferences** — which channels they've agreed to receive. You usually create a recipient when a user signs up for your product.
+  </Step>
+  <Step title="Channels">
+    A **channel** is a way to reach someone: email, SMS, push, in-app, or Slack. Each channel has its own strengths. SMS is immediate but expensive; email is cheap but slow; push is free but only works if the app is installed. A good notification uses the channel the message deserves.
+  </Step>
+  <Step title="Templates">
+    A **template** is reusable message content with blanks in it, like `Welcome to {{workspace}}, {{first_name}}!` You fill the blanks when you send. Templates are versioned, so changing the wording never breaks the code that sends them.
+  </Step>
+  <Step title="Messages">
+    A **message** is one send to one recipient on one or more channels. Your app says *send template X to recipient Y on email and push*, and PingMe does the rest — including skipping channels the recipient has opted out of.
+  </Step>
+  <Step title="Deliveries and events">
+    Behind each message is one **delivery** per channel with its own status (queued, sent, delivered, failed). PingMe reports these back through **webhooks** — automatic notifications to *your* servers — so your product can react, for example by showing "email sent" in your UI.
+  </Step>
+</Steps>
+
+## What happens when a message is sent
+
+<Tabs>
+  <Tab title="The happy path">
+    1. Your app calls PingMe with a recipient, a template, and a list of channels.
+    2. PingMe checks the recipient's preferences and quiet hours and drops any channel they've opted out of.
+    3. PingMe renders the template with the values you supplied.
+    4. Each remaining channel is handed to the right provider — an email gateway, a carrier, Apple or Google's push service, Slack.
+    5. As providers confirm delivery, PingMe updates each delivery record and sends `message.delivered` events to your webhook endpoint.
+  </Tab>
+  <Tab title="When something fails">
+    1. A provider rejects a send (an invalid device token, a full mailbox, a disconnected phone number).
+    2. PingMe retries transient errors automatically with increasing delays.
+    3. If the channel still fails, that delivery is marked `failed` with the provider's reason.
+    4. PingMe sends a `message.failed` event so your app can fall back — for example, sending an email when push fails.
+    5. The message's overall status becomes `partially_delivered` (some channels worked) or `failed` (none did).
+  </Tab>
+  <Tab title="When a user opts out">
+    1. A user clicks an unsubscribe link, replies STOP to an SMS, or flips a toggle in your settings page.
+    2. PingMe records the preference on the recipient.
+    3. Future sends on that channel are silently **skipped**, not failed — so your code doesn't need special handling.
+    4. PingMe sends a `recipient.unsubscribed` event so you can mirror the change in your own database.
+  </Tab>
+</Tabs>
+
+## Build or buy?
+
+<Columns cols={2}>
+  <Card title="Build it yourself when…" icon="hammer">
+    You send one channel, at low volume, to users who never need to change preferences — and you're confident that will stay true.
+  </Card>
+  <Card title="Use a platform when…" icon="rocket">
+    You send on two or more channels, need unsubscribe compliance, want delivery visibility, or your team would rather ship product features than maintain retry logic.
+  </Card>
+</Columns>
+
+## Where to go next
+
+- The [Glossary](/learn/glossary) defines every term used above.
+- [Plans, security & FAQ](/product/plans-security-faq) covers cost and compliance.
+- Engineers can jump straight to the [Quickstart](/v2/quickstart).

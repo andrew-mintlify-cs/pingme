@@ -1,0 +1,86 @@
+---
+title: "Plans, security & FAQ"
+description: "What PingMe costs, how it protects your data, and answers to common evaluation questions."
+icon: "shield-check"
+---
+
+This page is written for the person deciding whether to buy PingMe. For implementation details, see the [Developers](/v2/quickstart) tab.
+
+## Plans
+
+All plans include every channel, templates, recipient preferences, webhooks, and the API playground. Plans differ in volume, retention, and support.
+
+| | Starter | Growth | Enterprise |
+| :-- | :-- | :-- | :-- |
+| Included messages / month | 10,000 | 250,000 | Custom |
+| API rate limit | 60 req/min | 600 req/min | Custom |
+| Delivery log retention | 7 days | 30 days | 13 months |
+| Webhook endpoints | 2 | 10 | Unlimited |
+| Team seats | 3 | 15 | Unlimited |
+| Support | Email, 2-business-day response | Email + chat, same-day | Dedicated CSM, Slack channel, 99.95% SLA |
+| SSO (SAML / OIDC) | — | — | Included |
+| Data residency (EU) | — | Add-on | Included |
+| Price | $49 / month | $399 / month | Contact sales |
+
+Overage on Starter and Growth is billed per message by channel. Email and in-app are the least expensive channels; SMS pricing varies by destination country.
+
+<Tip>
+  Most teams start on Growth. Starter's 60 req/min rate limit is fine for a prototype but is easy to hit once a real sign-up flow is sending welcome sequences.
+</Tip>
+
+## Security and compliance
+
+<AccordionGroup>
+  <Accordion title="Certifications and audits">
+    PingMe is SOC 2 Type II audited annually. The current report and bridge letter are available under NDA from your account team. Penetration tests are performed twice a year by an independent firm.
+  </Accordion>
+  <Accordion title="Data residency">
+    Workspaces are hosted in the United States by default. Enterprise workspaces can be pinned to the EU (Frankfurt) region, in which case recipient data, message content, and delivery logs never leave the EU. Provider hand-offs (for example to APNs or a carrier) happen from the same region.
+  </Accordion>
+  <Accordion title="Encryption">
+    All traffic uses TLS 1.2 or higher. Data is encrypted at rest with AES-256. Webhook payloads are signed with HMAC-SHA256 so you can verify they came from PingMe.
+  </Accordion>
+  <Accordion title="Data retention and deletion">
+    Message content is retained for the plan's delivery log retention window and then permanently deleted. Recipient records persist until you delete them via the API or dashboard. Deletion requests are completed within 30 days, including backups.
+  </Accordion>
+  <Accordion title="Sub-processors">
+    PingMe uses cloud infrastructure providers and channel delivery providers (email, SMS carriers, APNs, FCM, Slack) as sub-processors. The current list is published at pingme.dev/legal/subprocessors and customers receive 30 days' notice of changes.
+  </Accordion>
+  <Accordion title="Access control">
+    Dashboard roles are Owner, Admin, Developer, and Viewer. API keys are scoped to a workspace and can be individually revoked. Enterprise plans include SAML/OIDC single sign-on and audit logs.
+  </Accordion>
+</AccordionGroup>
+
+## Frequently asked questions
+
+<AccordionGroup>
+  <Accordion title="Do I still need my own email or SMS provider?">
+    No. PingMe delivers email, SMS, and push through its own provider relationships. If you already have contracts with a provider, Growth and Enterprise plans can route through your existing account instead.
+  </Accordion>
+  <Accordion title="How is PingMe different from just using an email API?">
+    An email API sends email. PingMe decides *whether* to send (preferences, quiet hours), *where* to send (channel routing), *what* to send (templates and variables), and *what happened* (unified delivery status across channels). See [How notification platforms work](/learn/how-notification-platforms-work) for the longer answer.
+  </Accordion>
+  <Accordion title="Can end users manage their own notification preferences?">
+    Yes. Every email includes an unsubscribe link and every SMS honors STOP. Your app can also read and write preferences through the Recipients API, and PingMe emits a `recipient.unsubscribed` webhook whenever a preference changes.
+  </Accordion>
+  <Accordion title="What happens if a channel fails?">
+    PingMe retries transient failures automatically. If a channel ultimately fails, the message's aggregate status becomes `partially_delivered` or `failed`, a `message.failed` webhook fires, and the delivery record includes the provider's error code so you can decide what to do next.
+  </Accordion>
+  <Accordion title="Is there a sandbox?">
+    Yes. Test API keys (`pm_test_…`) exercise the full API and appear in your delivery logs but never deliver to real recipients. Use them in development, CI, and demos.
+  </Accordion>
+  <Accordion title="What does implementation typically take?">
+    Teams usually have a first message sending within an hour and a production onboarding sequence live within a week. The [Quickstart](/v2/quickstart) and the [welcome sequence guide](/v2/build-a-welcome-sequence) are the two pages your engineers will use.
+  </Accordion>
+</AccordionGroup>
+
+## Talk to us
+
+<CardGroup cols={2}>
+  <Card title="Request a demo" icon="calendar" href="https://pingme.dev/demo">
+    A 30-minute walkthrough with a solutions engineer, tailored to your use case.
+  </Card>
+  <Card title="Contact sales" icon="envelope" href="mailto:sales@pingme.dev">
+    Enterprise pricing, security questionnaires, and procurement paperwork.
+  </Card>
+</CardGroup>

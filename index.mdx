@@ -1,0 +1,60 @@
+---
+title: "PingMe documentation"
+sidebarTitle: "Welcome"
+description: "One API to reach your users on email, SMS, push, in-app, and Slack — with templates, preferences, and delivery tracking built in."
+mode: "wide"
+---
+
+PingMe is a notifications platform for product teams. Your application makes one API call; PingMe renders the template, respects each recipient's channel preferences, delivers through the right provider, retries failures, and tells you what happened.
+
+<Frame caption="Your app talks to one API. PingMe handles rendering, routing, delivery, and reporting.">
+  <img src="/images/how-it-works.svg" alt="Diagram: your application sends a request to PingMe, which routes to email, SMS, push, in-app, and Slack, and reports back via webhooks." />
+</Frame>
+
+## Start here
+
+<CardGroup cols={3}>
+  <Card title="I'm evaluating PingMe" icon="scale-balanced" href="/product/plans-security-faq">
+    Plans, limits, security posture, and answers to the questions procurement asks.
+  </Card>
+  <Card title="I'm new to notifications" icon="graduation-cap" href="/learn/how-notification-platforms-work">
+    How channels, templates, and preferences fit together — no code required.
+  </Card>
+  <Card title="I'm implementing PingMe" icon="code" href="/v2/quickstart">
+    Send your first message in five minutes, then build a real onboarding sequence.
+  </Card>
+</CardGroup>
+
+## Common use cases
+
+<Columns cols={2}>
+  <Card title="User onboarding" icon="hand-wave" href="/v2/build-a-welcome-sequence">
+    Welcome emails, day-3 nudges, and trial-ending reminders driven by a single template set.
+  </Card>
+  <Card title="Transactional alerts" icon="bell" href="/v2/quickstart">
+    Verification codes, receipts, and password resets on SMS, email, or push — whichever the user prefers.
+  </Card>
+  <Card title="Team and ops alerts" icon="slack" href="/v2/integrations/slack">
+    Route incidents, approvals, and daily digests into Slack channels alongside user-facing sends.
+  </Card>
+  <Card title="Delivery tracking" icon="chart-line" href="/v2/webhooks">
+    Subscribe to webhook events and keep your own systems in sync with what was actually delivered.
+  </Card>
+</Columns>
+
+## Explore the docs
+
+<CardGroup cols={2}>
+  <Card title="API reference" icon="terminal" href="/v2/api-reference/messages/send-a-message">
+    Every endpoint with request and response examples and an interactive playground.
+  </Card>
+  <Card title="Webhook events" icon="webhook" href="/v2/webhook-events/message-delivered">
+    Payloads and signature verification for every event PingMe sends you.
+  </Card>
+  <Card title="Glossary" icon="book" href="/learn/glossary">
+    Recipients, channels, deliveries, providers, and the rest of the vocabulary.
+  </Card>
+  <Card title="Changelog" icon="list" href="/changelog">
+    What shipped, what changed, and what's deprecated.
+  </Card>
+</CardGroup>

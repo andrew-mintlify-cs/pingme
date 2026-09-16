@@ -1,0 +1,49 @@
+---
+title: "Glossary"
+description: "Definitions for the terms used throughout the PingMe docs."
+icon: "book"
+---
+
+Terms are listed alphabetically. Where a term maps to an API object, the object name is shown in code.
+
+**Aggregate status** — The overall state of a message across all of its channels: `queued`, `sent`, `delivered`, `partially_delivered`, `failed`, `scheduled`, or `cancelled`. Derived from the individual delivery statuses.
+
+**API key** — A secret token that identifies your workspace when calling the API. Live keys start with `pm_live_` and deliver to real people; test keys start with `pm_test_` and never leave the sandbox. See [API keys](/v2/api-keys).
+
+**Channel** (`channel`) — A way of reaching a recipient. PingMe supports `email`, `sms`, `push`, `in_app`, and `slack`.
+
+**Delivery** (`Delivery`) — The per-channel record of a message attempt, including status, provider, attempt count, and any error. One message has one delivery per channel it was sent on.
+
+**Event** — Something that happened that PingMe can tell you about, such as `message.delivered` or `recipient.unsubscribed`. Events are delivered to your [webhook endpoints](/v2/webhooks).
+
+**External ID** (`external_id`) — Your own identifier for a recipient, typically the user ID in your database. Lets you reference recipients without storing PingMe IDs.
+
+**Idempotency key** (`Idempotency-Key` header) — A unique string you attach to a send so that a retried request doesn't produce a duplicate message. Available in API v2.
+
+**In-app** — A channel that stores the notification for display inside your own application's notification center, rather than delivering externally.
+
+**Message** (`Message`) — A single send to a single recipient on one or more channels, created with `POST /messages`.
+
+**Preferences** (`preferences`) — Per-channel opt-in flags stored on a recipient. Channels set to `false` are skipped on send.
+
+**Provider** — The downstream service PingMe uses to deliver on a channel: an email gateway, an SMS carrier aggregator, APNs (Apple), FCM (Google), or Slack.
+
+**Quiet hours** — A window in the recipient's local time zone during which non-urgent sends are held until the window ends.
+
+**Rate limit** — The maximum number of API requests your workspace can make per minute. See [Errors and rate limits](/v2/errors-and-rate-limits).
+
+**Recipient** (`Recipient`) — A person you can send to, with contact details, locale, time zone, and preferences.
+
+**Scheduled send** (`scheduled_at`) — A message queued for delivery at a future time (up to 30 days ahead). Can be cancelled before it sends. Available in API v2.
+
+**Signing secret** — A per-endpoint secret returned once when you create a webhook endpoint. Used to verify the `PingMe-Signature` header on incoming events.
+
+**Skipped** — A delivery status meaning PingMe intentionally did not send on a channel, usually because of preferences or quiet hours. Not a failure.
+
+**Template** (`Template`) — Reusable message content containing `{{variable}}` placeholders. Templates are versioned; creating a template with an existing name creates a new version.
+
+**Variable** — A placeholder in a template, such as `{{first_name}}`, filled from the `data` object when you send.
+
+**Webhook endpoint** (`WebhookEndpoint`) — An HTTPS URL on your servers that PingMe posts events to.
+
+**Workspace** — The top-level container for your recipients, templates, keys, and team members. Most companies have one production workspace and one for staging.
