@@ -1,0 +1,113 @@
+---
+title: "Slack"
+description: "Connect a Slack workspace and use Slack as a PingMe channel for team-facing alerts."
+icon: "slack"
+---
+
+Slack is a first-class PingMe channel. Once connected, you send to Slack exactly the way you send email or push — same endpoint, same templates — which makes it easy to notify your own team about things happening to your users.
+
+## How it fits
+
+Most teams use Slack for **internal** notifications that complement user-facing ones:
+
+| User-facing send | Team-facing Slack send |
+| :-- | :-- |
+| Welcome email to a new enterprise sign-up | `#sales` alert: "Acme Analytics (plan: Enterprise trial) just signed up" |
+| Password reset SMS | `#security` alert if more than 5 resets in an hour |
+| Payment receipt email | `#finance` digest of the day's invoices |
+
+A recipient in PingMe can therefore be a *Slack channel* rather than a person.
+
+## Connect Slack
+
+<Steps>
+  <Step title="Install the PingMe app">
+    In the dashboard, go to **Settings → Channels → Slack** and click **Connect**. You'll be taken to Slack to authorize the app. You need permission to install apps in your Slack workspace, or a Slack admin to approve the request.
+  </Step>
+  <Step title="Choose channels">
+    Select which Slack channels PingMe may post to. You can add more later. Private channels require you to `/invite @PingMe` in Slack first.
+  </Step>
+  <Step title="Note the channel IDs">
+    Each connected channel shows its Slack ID (like `C07ABC123`). You'll use these as the `slack_channel` when creating recipients.
+  </Step>
+</Steps>
+
+## Create a recipient for a Slack channel
+
+Endpoint: [Create a recipient](/v2/api-reference/recipients/create-a-recipient)
+
+<CodeGroup>
+```bash curl
+curl https://api.pingme.dev/v2/recipients \
+  -H "Authorization: Bearer $PINGME_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "external_id": "slack-sales-alerts",
+    "slack_channel": "C07ABC123",
+    "timezone": "America/New_York",
+    "preferences": { "slack": true, "email": false, "sms": false, "push": false }
+  }'
+```
+
+```python Python
+sales_channel = requests.post(f"{API}/recipients", headers=HEADERS, json={
+    "external_id": "slack-sales-alerts",
+    "slack_channel": "C07ABC123",
+    "timezone": "America/New_York",
+    "preferences": {"slack": True, "email": False, "sms": False, "push": False},
+}).json()
+```
+</CodeGroup>
+
+<Note>
+  `slack_channel` is accepted on recipients once Slack is connected. Set the other channel preferences to `false` so a template that also lists `email` won't attempt to email a Slack channel.
+</Note>
+
+## Send to Slack
+
+Create a template that includes `slack` in its channels, then send as usual.
+
+Endpoint: [Send a message](/v2/api-reference/messages/send-a-message)
+
+<CodeGroup>
+```bash curl
+curl https://api.pingme.dev/v2/messages \
+  -H "Authorization: Bearer $PINGME_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "recipient_id": "rcp_01J8XA9SLK",
+    "channels": ["slack"],
+    "content": {
+      "subject": "New enterprise sign-up",
+      "body": "*Acme Analytics* just started an Enterprise trial. Owner: priya@acme-analytics.example"
+    }
+  }'
+```
+
+```python Python
+requests.post(f"{API}/messages", headers=HEADERS, json={
+    "recipient_id": sales_channel["id"],
+    "channels": ["slack"],
+    "content": {
+        "subject": "New enterprise sign-up",
+        "body": f"*{user.workspace_name}* just started an Enterprise trial. Owner: {user.email}",
+    },
+})
+```
+</CodeGroup>
+
+Slack messages support Slack's `mrkdwn` formatting (`*bold*`, `_italic_`, `<https://…|links>`). The `subject` is rendered as a bold first line.
+
+## Delivery and errors
+
+Slack deliveries appear in [Get message deliveries](/v2/api-reference/messages/get-message-deliveries) with `provider: slack`. Common failure codes:
+
+| `error.code` | Meaning | Fix |
+| :-- | :-- | :-- |
+| `channel_not_found` | The channel ID is wrong or PingMe was removed from it | Re-check the ID in **Settings → Channels → Slack** |
+| `not_in_channel` | Private channel without the app invited | Run `/invite @PingMe` in Slack |
+| `slack_rate_limited` | Slack throttled the workspace | PingMe retries automatically; spread bursts with `scheduled_at` |
+
+## Disconnect
+
+Removing the PingMe app from Slack (or clicking **Disconnect** in the dashboard) immediately marks all Slack deliveries as `skipped`. Recipients and templates are unaffected, so reconnecting restores sends without code changes.

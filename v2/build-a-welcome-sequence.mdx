@@ -1,0 +1,276 @@
+---
+title: "Build a welcome sequence"
+description: "Use templates, multi-channel sends, scheduling, and preferences together to onboard a new user the way a real product does."
+icon: "hand-wave"
+---
+
+The [Quickstart](/v2/quickstart) sends one message. Real products send *sequences*: a welcome message the moment someone signs up, a nudge if they haven't done anything by day three, and a reminder before their trial ends. This guide builds that sequence end to end and shows how each PingMe endpoint fits.
+
+<Info>
+  Each step links to the endpoint in the [API reference](/v2/api-reference/messages/send-a-message), where you can try the same call in the playground with your own test key.
+</Info>
+
+## What you'll build
+
+| When | What | Channels |
+| :-- | :-- | :-- |
+| Immediately on sign-up | Welcome message | Email + push |
+| Day 3, if the user hasn't created a project | Getting-started nudge | Push, falling back to email |
+| 3 days before trial ends | Trial-ending reminder | Email |
+
+All three messages use templates, so your marketing team can edit copy in the dashboard without an engineering deploy.
+
+## Before you start
+
+You need a test API key exported as `PINGME_API_KEY` (see [API keys](/v2/api-keys)) and the shared setup below:
+
+```python
+import os, requests
+from datetime import datetime, timedelta, timezone
+
+API = "https://api.pingme.dev/v2"
+HEADERS = {"Authorization": f"Bearer {os.environ['PINGME_API_KEY']}"}
+```
+
+<Steps>
+  <Step title="Create the templates">
+    Templates hold the copy and declare which channels they support. Variables use `{{double_braces}}`. Create these once — in practice from a setup script or the dashboard, not on every sign-up.
+
+    Endpoint: [Create a template](/v2/api-reference/templates/create-a-template)
+
+    <CodeGroup>
+    ```bash curl
+    curl https://api.pingme.dev/v2/templates \
+      -H "Authorization: Bearer $PINGME_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "name": "welcome",
+        "channels": ["email", "push"],
+        "subject": "Welcome to {{workspace}}, {{first_name}}!",
+        "body": "Hi {{first_name}}, your workspace {{workspace}} is ready. Start by inviting your team."
+      }'
+    ```
+
+    ```python Python
+    templates = {}
+    for spec in [
+        {
+            "name": "welcome",
+            "channels": ["email", "push"],
+            "subject": "Welcome to {{workspace}}, {{first_name}}!",
+            "body": "Hi {{first_name}}, your workspace {{workspace}} is ready. Start by inviting your team.",
+        },
+        {
+            "name": "day3_nudge",
+            "channels": ["push", "email"],
+            "subject": "Create your first project",
+            "body": "{{first_name}}, most teams create a project on day one. Yours takes two minutes.",
+        },
+        {
+            "name": "trial_ending",
+            "channels": ["email"],
+            "subject": "Your trial ends in {{days_left}} days",
+            "body": "Keep {{workspace}} running after {{trial_end_date}} by choosing a plan.",
+        },
+    ]:
+        t = requests.post(f"{API}/templates", headers=HEADERS, json=spec).json()
+        templates[t["name"]] = t["id"]
+    ```
+    </CodeGroup>
+
+    <Tip>
+      Creating a template with an existing `name` creates a new **version** rather than overwriting. Sends always use the latest version, and the version number is recorded on every delivery so you can attribute results to copy changes.
+    </Tip>
+  </Step>
+
+  <Step title="Create the recipient at sign-up">
+    In your sign-up handler, create a PingMe recipient alongside your own user record. Pass your user ID as `external_id` and set preferences to reflect what the user consented to. Timezone matters — PingMe uses it for quiet hours and for scheduled sends.
+
+    Endpoint: [Create a recipient](/v2/api-reference/recipients/create-a-recipient)
+
+    <CodeGroup>
+    ```bash curl
+    curl https://api.pingme.dev/v2/recipients \
+      -H "Authorization: Bearer $PINGME_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "external_id": "user_8841",
+        "email": "priya@acme-analytics.example",
+        "phone": "+14155550142",
+        "locale": "en-US",
+        "timezone": "America/Los_Angeles",
+        "preferences": { "email": true, "push": true, "sms": false }
+      }'
+    ```
+
+    ```python Python
+    def on_user_signed_up(user):
+        recipient = requests.post(f"{API}/recipients", headers=HEADERS, json={
+            "external_id": user.id,
+            "email": user.email,
+            "phone": user.phone,
+            "locale": user.locale,
+            "timezone": user.timezone,
+            "preferences": {"email": True, "push": True, "sms": False},
+        }).json()
+        user.pingme_recipient_id = recipient["id"]
+        user.save()
+        return recipient
+    ```
+    </CodeGroup>
+  </Step>
+
+  <Step title="Send the welcome message immediately">
+    Send on both email and push. If the user hasn't installed the mobile app yet, the push delivery is marked `skipped` rather than failed — no special handling required.
+
+    Endpoint: [Send a message](/v2/api-reference/messages/send-a-message)
+
+    <CodeGroup>
+    ```bash curl
+    curl https://api.pingme.dev/v2/messages \
+      -H "Authorization: Bearer $PINGME_API_KEY" \
+      -H "Content-Type: application/json" \
+      -H "Idempotency-Key: welcome-user_8841" \
+      -d '{
+        "recipient_id": "rcp_01J8X4K2M9",
+        "template_id": "tpl_welcome_v3",
+        "channels": ["email", "push"],
+        "data": { "first_name": "Priya", "workspace": "Acme Analytics" }
+      }'
+    ```
+
+    ```python Python
+    welcome = requests.post(
+        f"{API}/messages",
+        headers={**HEADERS, "Idempotency-Key": f"welcome-{user.id}"},
+        json={
+            "recipient_id": recipient["id"],
+            "template_id": templates["welcome"],
+            "channels": ["email", "push"],
+            "data": {"first_name": user.first_name, "workspace": user.workspace_name},
+        },
+    ).json()
+    ```
+    </CodeGroup>
+
+    The `Idempotency-Key` is built from your user ID, so if your sign-up handler is retried the user still gets exactly one welcome message.
+  </Step>
+
+  <Step title="Schedule the day-3 nudge and the trial reminder">
+    Instead of running a cron job, schedule both follow-ups now with `scheduled_at`. PingMe holds them and sends at the right time in the recipient's time zone. Keep the returned message IDs — you'll need them to cancel.
+
+    Endpoint: [Send a message](/v2/api-reference/messages/send-a-message) with `scheduled_at`
+
+    <CodeGroup>
+    ```bash curl
+    curl https://api.pingme.dev/v2/messages \
+      -H "Authorization: Bearer $PINGME_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "recipient_id": "rcp_01J8X4K2M9",
+        "template_id": "tpl_day3_nudge",
+        "channels": ["push", "email"],
+        "scheduled_at": "2026-09-18T16:00:00Z",
+        "data": { "first_name": "Priya" }
+      }'
+    ```
+
+    ```python Python
+    now = datetime.now(timezone.utc)
+
+    nudge = requests.post(f"{API}/messages", headers=HEADERS, json={
+        "recipient_id": recipient["id"],
+        "template_id": templates["day3_nudge"],
+        "channels": ["push", "email"],
+        "scheduled_at": (now + timedelta(days=3)).isoformat(),
+        "data": {"first_name": user.first_name},
+    }).json()
+
+    reminder = requests.post(f"{API}/messages", headers=HEADERS, json={
+        "recipient_id": recipient["id"],
+        "template_id": templates["trial_ending"],
+        "channels": ["email"],
+        "scheduled_at": (user.trial_ends_at - timedelta(days=3)).isoformat(),
+        "data": {
+            "workspace": user.workspace_name,
+            "days_left": 3,
+            "trial_end_date": user.trial_ends_at.strftime("%B %d"),
+        },
+    }).json()
+
+    user.pingme_scheduled = {"nudge": nudge["id"], "reminder": reminder["id"]}
+    user.save()
+    ```
+    </CodeGroup>
+  </Step>
+
+  <Step title="Cancel what's no longer relevant">
+    When the user creates their first project, the day-3 nudge would be annoying. Cancel it. Likewise, cancel the trial reminder if they upgrade early. Cancelling a message that already sent returns `409 conflict` — safe to ignore.
+
+    Endpoint: [Cancel a scheduled message](/v2/api-reference/messages/cancel-a-scheduled-message)
+
+    <CodeGroup>
+    ```bash curl
+    curl -X POST https://api.pingme.dev/v2/messages/msg_01J8X6C2RT/cancel \
+      -H "Authorization: Bearer $PINGME_API_KEY"
+    ```
+
+    ```python Python
+    def on_first_project_created(user):
+        r = requests.post(
+            f"{API}/messages/{user.pingme_scheduled['nudge']}/cancel", headers=HEADERS
+        )
+        if r.status_code not in (200, 409):
+            r.raise_for_status()
+    ```
+    </CodeGroup>
+  </Step>
+
+  <Step title="Respect preference changes">
+    When the user turns off push in your settings page, update the recipient. PingMe skips push on any future send and fires a `recipient.unsubscribed` webhook. Nothing about your sending code needs to change.
+
+    Endpoint: [Update a recipient](/v2/api-reference/recipients/update-a-recipient)
+
+    <CodeGroup>
+    ```bash curl
+    curl -X PATCH https://api.pingme.dev/v2/recipients/rcp_01J8X4K2M9 \
+      -H "Authorization: Bearer $PINGME_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{ "preferences": { "push": false } }'
+    ```
+
+    ```python Python
+    def on_notification_settings_changed(user, prefs):
+        requests.patch(
+            f"{API}/recipients/{user.pingme_recipient_id}",
+            headers=HEADERS,
+            json={"preferences": prefs},
+        ).raise_for_status()
+    ```
+    </CodeGroup>
+  </Step>
+</Steps>
+
+## Tracking results
+
+Two ways to know what happened:
+
+- **Pull:** [Get message deliveries](/v2/api-reference/messages/get-message-deliveries) returns one record per channel with status, provider, and error. Good for support tooling and dashboards.
+- **Push:** Register a [webhook endpoint](/v2/webhooks) and handle `message.delivered` and `message.failed`. Good for updating your own database in real time, for example to show "Email sent ✓" in your UI.
+
+## Going further
+
+<CardGroup cols={2}>
+  <Card title="Fallback channels" icon="arrows-turn-right">
+    On `message.failed` for push, send the same template on email. The [webhooks guide](/v2/webhooks) shows the handler.
+  </Card>
+  <Card title="Localized templates" icon="language">
+    Create one template per locale (`welcome`, `welcome_de`, `welcome_ja`) and pick by `recipient.locale` at send time.
+  </Card>
+  <Card title="Team alerts in Slack" icon="slack" href="/v2/integrations/slack">
+    Notify your own team when a high-value account signs up.
+  </Card>
+  <Card title="Staying under rate limits" icon="gauge" href="/v2/errors-and-rate-limits#rate-limits">
+    Batching sign-ups? Read this before a launch day.
+  </Card>
+</CardGroup>

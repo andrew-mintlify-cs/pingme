@@ -1,0 +1,134 @@
+---
+title: "Webhooks"
+description: "Receive delivery and preference events from PingMe, verify signatures, and handle retries."
+icon: "webhook"
+---
+
+Webhooks let PingMe tell your servers what happened to a message instead of you polling for it. You register an HTTPS URL, choose the events you care about, and PingMe sends a signed `POST` each time one occurs.
+
+The full payload for each event is in the [Webhook events reference](/v2/webhook-events/message-delivered).
+
+## Register an endpoint
+
+Endpoint: [Create a webhook endpoint](/v2/api-reference/webhook-endpoints/create-a-webhook-endpoint)
+
+<CodeGroup>
+```bash curl
+curl https://api.pingme.dev/v2/webhooks \
+  -H "Authorization: Bearer $PINGME_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "url": "https://api.acme-analytics.example/webhooks/pingme",
+    "events": ["message.delivered", "message.failed", "recipient.unsubscribed"],
+    "description": "Production delivery tracking"
+  }'
+```
+
+```python Python
+endpoint = requests.post(f"{API}/webhooks", headers=HEADERS, json={
+    "url": "https://api.acme-analytics.example/webhooks/pingme",
+    "events": ["message.delivered", "message.failed", "recipient.unsubscribed"],
+    "description": "Production delivery tracking",
+}).json()
+
+print(endpoint["secret"])  # whsec_… — shown once, store it now
+```
+</CodeGroup>
+
+<Warning>
+  The `secret` in the create response is shown **once**. Store it in your secrets manager next to your API key. If you lose it, delete the endpoint and create a new one.
+</Warning>
+
+Endpoints created with a test key receive events from test-mode sends only, so you can develop your handler against the sandbox.
+
+## Verify signatures
+
+Every request carries two headers:
+
+| Header | Example | Purpose |
+| :-- | :-- | :-- |
+| `PingMe-Signature` | `t=1758000000,v1=5257a869…` | Timestamp and HMAC-SHA256 over `"<t>.<raw body>"` |
+| `PingMe-Event-Id` | `evt_01J8X8C3D4` | Unique per event; use it to ignore duplicates |
+
+Verify before you trust the payload. Reject requests whose timestamp is more than five minutes old to defeat replay.
+
+```python
+import hmac, hashlib, time
+from flask import Flask, request, abort
+
+app = Flask(__name__)
+SECRET = os.environ["PINGME_WEBHOOK_SECRET"]
+
+def verify(raw_body: bytes, header: str, tolerance=300) -> bool:
+    parts = dict(p.split("=", 1) for p in header.split(","))
+    ts, sig = parts["t"], parts["v1"]
+    if abs(time.time() - int(ts)) > tolerance:
+        return False
+    expected = hmac.new(
+        SECRET.encode(), f"{ts}.".encode() + raw_body, hashlib.sha256
+    ).hexdigest()
+    return hmac.compare_digest(expected, sig)
+
+@app.post("/webhooks/pingme")
+def pingme_webhook():
+    if not verify(request.get_data(), request.headers.get("PingMe-Signature", "")):
+        abort(401)
+    event = request.get_json()
+    handle(event)          # your logic — see below
+    return "", 200
+```
+
+<Note>
+  Compute the signature over the **raw** request body, before any JSON parsing or re-serialization. Frameworks that parse the body for you often expose the original bytes separately — in Flask it's `request.get_data()`, in Express it requires the `raw` body parser.
+</Note>
+
+## Handle events
+
+A typical handler does three things: deduplicate, update your own records, and decide whether to act.
+
+```python
+seen = set()  # use your database in production
+
+def handle(event):
+    if event["id"] in seen:
+        return
+    seen.add(event["id"])
+
+    kind, data = event["type"], event["data"]
+
+    if kind == "message.delivered":
+        mark_delivered(data["message_id"], data["channel"])
+
+    elif kind == "message.failed":
+        mark_failed(data["message_id"], data["channel"], data["error"]["code"])
+        if data["channel"] == "push":
+            # Fallback: resend the same template on email
+            requests.post(f"{API}/messages", headers=HEADERS, json={
+                "recipient_id": data["recipient_id"],
+                "template_id": data["template_id"],
+                "channels": ["email"],
+            })
+
+    elif kind == "recipient.unsubscribed":
+        sync_preference(data["external_id"], data["channel"], enabled=False)
+```
+
+## Retries and ordering
+
+- Respond with any `2xx` within **10 seconds**. Do slow work asynchronously.
+- Non-`2xx` responses and timeouts are retried with exponential backoff for up to **24 hours** (8 attempts).
+- Events may arrive **out of order** or **more than once**. Use `PingMe-Event-Id` to deduplicate and `created_at` to order.
+- After 8 failed attempts the endpoint's `status` becomes `disabled` and workspace admins are emailed. Re-enable it in the dashboard once your handler is healthy.
+
+## Test locally
+
+Use a tunnelling tool (for example ngrok or Cloudflare Tunnel) to expose your local server, register the tunnel URL with a test key, then send a test message from the [playground](/v2/api-reference/messages/send-a-message). Events appear within seconds. The dashboard's **Webhooks → Deliveries** view shows every attempt, the response code you returned, and lets you replay any event.
+
+## Event reference
+
+| Event | Fires when | Reference |
+| :-- | :-- | :-- |
+| `message.sent` | A channel was handed to its provider | [message.sent](/v2/webhook-events/message-sent) |
+| `message.delivered` | The provider confirmed delivery | [message.delivered](/v2/webhook-events/message-delivered) |
+| `message.failed` | All retries on a channel failed | [message.failed](/v2/webhook-events/message-failed) |
+| `recipient.unsubscribed` | A recipient opted out of a channel | [recipient.unsubscribed](/v2/webhook-events/recipient-unsubscribed) |

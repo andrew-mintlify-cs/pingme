@@ -1,0 +1,145 @@
+---
+title: "Quickstart"
+description: "Send your first PingMe notification in about five minutes using a test API key."
+icon: "rocket"
+---
+
+By the end of this page you'll have created a recipient, sent them a message, and confirmed delivery — all against the sandbox, so nothing reaches a real inbox.
+
+<Info>
+  This quickstart uses API **v2**. If you're maintaining an existing v1 integration, switch versions in the sidebar.
+</Info>
+
+## Prerequisites
+
+- A PingMe account. [Sign up free](https://app.pingme.dev/signup) — no card required for the sandbox.
+- A test API key from **Settings → API keys**. Test keys start with `pm_test_`. See [API keys](/v2/api-keys) for the difference between test and live keys.
+- `curl` or Python 3.9+.
+
+Set your kay as an environment variable so the examples below work as written:
+
+```bash
+export PINGME_API_KEY="pm_test_your_key_here"
+```
+
+## Send your first message
+
+<Steps>
+  <Step title="Create a recipient">
+    A recipient is the person you're sending to. Store your own user ID in `external_id` so you can find them later without a lookup table.
+
+    <CodeGroup>
+    ```bash curl
+    curl https://api.pingme.dev/v2/recipients \
+      -H "Authorization: Bearer $PINGME_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "external_id": "user_8841",
+        "email": "priya@acme-analytics.example",
+        "locale": "en-US",
+        "timezone": "America/Los_Angeles"
+      }'
+    ```
+
+    ```python Python
+    import os, requests
+
+    API = "https://api.pingme.dev/v2"
+    HEADERS = {"Authorization": f"Bearer {os.environ['PINGME_API_KEY']}"}
+
+    recipient = requests.post(f"{API}/recipients", headers=HEADERS, json={
+        "external_id": "user_8841",
+        "email": "priya@acme-analytics.example",
+        "locale": "en-US",
+        "timezone": "America/Los_Angeles",
+    }).json()
+
+    print(recipient["id"])  # rcp_01J8X4K2M9
+    ```
+    </CodeGroup>
+
+    The response includes an `id` starting with `rcp_`. You'll use it in the the next step.
+  </Step>
+
+  <Step title="Send a message">
+    For a first send, use inline content rather than a template. Because this is a test key, the message is processed end to end but not delivered to the real address.
+
+    <CodeGroup>
+    ```bash curl
+    curl https://api.pingme.dev/v2/messages \
+      -H "Authorization: Bearer $PINGME_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "recipient_id": "rcp_01J8X4K2M9",
+        "channels": ["email"],
+        "content": {
+          "subject": "Hello from PingMe",
+          "body": "If you can read this, your integration works."
+        }
+      }'
+    ```
+
+    ```python Python
+    message = requests.post(f"{API}/messages", headers=HEADERS, json={
+        "recipient_id": recipient["id"],
+        "channels": ["email"],
+        "content": {
+            "subject": "Hello from PingMe",
+            "body": "If you can read this, your integration works.",
+        },
+    }).json()
+
+    print(message["status"])  # queued
+    ```
+    </CodeGroup>
+
+    You'll recieve a `202 Accepted` with `status: queued`. Sends are asynchronous — PingMe hands the message to the provider and reports progress seperately.
+  </Step>
+
+  <Step title="Check delivery">
+    Poll the message's deliveries to see the per-channel result. In production you'd use [webhooks](/v2/webhooks) instead of polling.
+
+    <CodeGroup>
+    ```bash curl
+    curl https://api.pingme.dev/v2/messages/msg_01J8X5A7QZ/deliveries \
+      -H "Authorization: Bearer $PINGME_API_KEY"
+    ```
+
+    ```python Python
+    deliveries = requests.get(
+        f"{API}/messages/{message['id']}/deliveries", headers=HEADERS
+    ).json()["data"]
+
+    for d in deliveries:
+        print(d["channel"], d["status"])  # email delivered
+    ```
+    </CodeGroup>
+
+    In the sandbox, deliveries move to `delivered` within a few seconds. You can also see the message under **Logs** in the dashboard.
+  </Step>
+</Steps>
+
+<Check>
+  That's the whole loop: create a recipient, send, confirm. Everything else in PingMe — templates, multi-channel routing, preferences, scheduling — builds on these three calls.
+</Check>
+
+## Try it in the playground
+
+Every endpoint page in the [API reference](/v2/api-reference/messages/send-a-message) has an interactive playground. Paste your test key, edit the example body, and send — it's the fastest way to explore fields before writing code.
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Build a welcome sequence" icon="hand-wave" href="/v2/build-a-welcome-sequence">
+    Templates, multi-channel sends, scheduling, and preferences in one realistic flow.
+  </Card>
+  <Card title="Set up webhooks" icon="webhook" href="/v2/webhooks">
+    Replace polling with events and verify signatures.
+  </Card>
+  <Card title="Understand errors and rate limits" icon="triangle-exclamation" href="/v2/errors-and-rate-limits">
+    What each error type means and how to retry safely.
+  </Card>
+  <Card title="Connect Slack" icon="slack" href="/v2/integrations/slack">
+    Add Slack as a channel for team-facing alerts.
+  </Card>
+</CardGroup>
