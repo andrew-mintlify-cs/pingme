@@ -1,0 +1,258 @@
+openapi: 3.1.0
+info:
+  title: PingMe Webhook Events
+  version: "2.0.0"
+  summary: Events PingMe sends to your webhook endpoints.
+  description: |
+    PingMe sends an HTTP `POST` to each registered webhook endpoint when an event occurs.
+    Every request includes a `PingMe-Signature` header (`t=<unix timestamp>,v1=<hex HMAC-SHA256>`)
+    computed over `"<timestamp>.<raw body>"` with your endpoint's signing secret.
+
+    Respond with any `2xx` status within 10 seconds. Non-`2xx` responses and timeouts are retried
+    with exponential backoff for up to 24 hours (8 attempts).
+
+    Register endpoints with the **Create a webhook endpoint** operation in the Core API.
+  contact:
+    name: PingMe Support
+    email: support@pingme.dev
+tags:
+  - name: Message events
+    description: Emitted as a message moves through the delivery lifecycle.
+  - name: Recipient events
+    description: Emitted when a recipient's preferences change.
+
+webhooks:
+  messageSent:
+    post:
+      tags: [Message events]
+      operationId: messageSent
+      summary: message.sent
+      description: A message was handed to the downstream provider on at least one channel.
+      parameters:
+        - $ref: "#/components/parameters/Signature"
+        - $ref: "#/components/parameters/EventId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MessageEvent"
+            example:
+              id: evt_01J8X8A1B2
+              type: message.sent
+              created_at: "2026-09-15T17:42:12Z"
+              data:
+                message_id: msg_01J8X5A7QZ
+                recipient_id: rcp_01J8X4K2M9
+                template_id: tpl_welcome_v3
+                channel: email
+                provider: pingme-email
+      responses:
+        "200":
+          description: Return any 2xx status to acknowledge receipt.
+
+  messageDelivered:
+    post:
+      tags: [Message events]
+      operationId: messageDelivered
+      summary: message.delivered
+      description: |
+        The provider confirmed delivery on a channel. For email this means accepted by the
+        recipient's mail server; for push, accepted by APNs/FCM; for SMS, a carrier delivery receipt.
+      parameters:
+        - $ref: "#/components/parameters/Signature"
+        - $ref: "#/components/parameters/EventId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MessageEvent"
+            example:
+              id: evt_01J8X8C3D4
+              type: message.delivered
+              created_at: "2026-09-15T17:42:18Z"
+              data:
+                message_id: msg_01J8X5A7QZ
+                recipient_id: rcp_01J8X4K2M9
+                template_id: tpl_welcome_v3
+                channel: email
+                provider: pingme-email
+      responses:
+        "200":
+          description: Return any 2xx status to acknowledge receipt.
+
+  messageFailed:
+    post:
+      tags: [Message events]
+      operationId: messageFailed
+      summary: message.failed
+      description: Delivery on a channel failed after all retries. `data.error` explains why.
+      parameters:
+        - $ref: "#/components/parameters/Signature"
+        - $ref: "#/components/parameters/EventId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MessageFailedEvent"
+            example:
+              id: evt_01J8X8E5F6
+              type: message.failed
+              created_at: "2026-09-15T17:43:02Z"
+              data:
+                message_id: msg_01J8X5A7QZ
+                recipient_id: rcp_01J8X4K2M9
+                template_id: tpl_welcome_v3
+                channel: push
+                provider: apns
+                attempts: 3
+                error:
+                  code: device_token_invalid
+                  message: "The device token was rejected by APNs."
+      responses:
+        "200":
+          description: Return any 2xx status to acknowledge receipt.
+
+  recipientUnsubscribed:
+    post:
+      tags: [Recipient events]
+      operationId: recipientUnsubscribed
+      summary: recipient.unsubscribed
+      description: |
+        A recipient opted out of a channel, either through an unsubscribe link or because your
+        application set the preference to `false` with **Update a recipient**.
+      parameters:
+        - $ref: "#/components/parameters/Signature"
+        - $ref: "#/components/parameters/EventId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RecipientUnsubscribedEvent"
+            example:
+              id: evt_01J8X8G7H8
+              type: recipient.unsubscribed
+              created_at: "2026-09-15T18:01:40Z"
+              data:
+                recipient_id: rcp_01J8X4K2M9
+                external_id: user_8841
+                channel: sms
+                source: unsubscribe_link
+      responses:
+        "200":
+          description: Return any 2xx status to acknowledge receipt.
+
+components:
+  parameters:
+    Signature:
+      name: PingMe-Signature
+      in: header
+      required: true
+      schema:
+        type: string
+      example: "t=1758000000,v1=5257a869e7ecebeda32affa62cdca3fa51cad7e77a0e56ff536d0ce8e108d8bd"
+      description: Timestamp and HMAC-SHA256 signature. See the Webhooks guide for verification code.
+    EventId:
+      name: PingMe-Event-Id
+      in: header
+      required: true
+      schema:
+        type: string
+      example: evt_01J8X8C3D4
+      description: Unique event ID. Use it to deduplicate retried deliveries.
+
+  schemas:
+    Channel:
+      type: string
+      enum: [email, sms, push, in_app, slack]
+
+    MessageEvent:
+      type: object
+      required: [id, type, created_at, data]
+      properties:
+        id:
+          type: string
+          description: Unique event ID (also sent as `PingMe-Event-Id`).
+        type:
+          type: string
+          enum: [message.sent, message.delivered]
+        created_at:
+          type: string
+          format: date-time
+        data:
+          type: object
+          properties:
+            message_id:
+              type: string
+            recipient_id:
+              type: string
+            template_id:
+              type: [string, "null"]
+            channel:
+              $ref: "#/components/schemas/Channel"
+            provider:
+              type: string
+
+    MessageFailedEvent:
+      type: object
+      required: [id, type, created_at, data]
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+          enum: [message.failed]
+        created_at:
+          type: string
+          format: date-time
+        data:
+          type: object
+          properties:
+            message_id:
+              type: string
+            recipient_id:
+              type: string
+            template_id:
+              type: [string, "null"]
+            channel:
+              $ref: "#/components/schemas/Channel"
+            provider:
+              type: string
+            attempts:
+              type: integer
+            error:
+              type: object
+              properties:
+                code:
+                  type: string
+                message:
+                  type: string
+
+    RecipientUnsubscribedEvent:
+      type: object
+      required: [id, type, created_at, data]
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+          enum: [recipient.unsubscribed]
+        created_at:
+          type: string
+          format: date-time
+        data:
+          type: object
+          properties:
+            recipient_id:
+              type: string
+            external_id:
+              type: [string, "null"]
+            channel:
+              $ref: "#/components/schemas/Channel"
+            source:
+              type: string
+              enum: [unsubscribe_link, api, carrier_stop]
+              description: How the opt-out happened.
