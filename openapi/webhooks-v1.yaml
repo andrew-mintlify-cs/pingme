@@ -1,0 +1,210 @@
+openapi: 3.1.0
+info:
+  title: PingMe Webhook Events
+  version: 1.0.0
+  summary: Events PingMe sends to your webhook endpoints.
+  description: 'PingMe sends an HTTP `POST` to each registered webhook endpoint when an event occurs.
+
+    Every request includes an `X-PingMe-Signature` header containing a hex HMAC-SHA256 of the raw body,
+
+    computed with your endpoint''s signing secret.
+
+
+    Respond with any `2xx` status within 10 seconds. Non-`2xx` responses are retried up to 3 times over one hour.
+
+
+    **v1 is a legacy version.** v2 adds a timestamped signature scheme, the `PingMe-Event-Id` header, and the `recipient.unsubscribed`
+    event.
+
+    '
+  contact:
+    name: PingMe Support
+    email: support@pingme.dev
+tags:
+- name: Message events
+  description: Emitted as a message moves through the delivery lifecycle.
+webhooks:
+  messageSent:
+    post:
+      tags:
+      - Message events
+      operationId: messageSent
+      summary: message.sent
+      description: A message was handed to the downstream provider on at least one channel.
+      parameters:
+      - $ref: '#/components/parameters/Signature'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MessageEvent'
+            example:
+              id: evt_01J8X8A1B2
+              type: message.sent
+              created_at: '2026-09-15T17:42:12Z'
+              data:
+                message_id: msg_01J8X5A7QZ
+                recipient_id: rcp_01J8X4K2M9
+                template_id: tpl_welcome_v3
+                channel: email
+                provider: pingme-email
+      responses:
+        '200':
+          description: Return any 2xx status to acknowledge receipt.
+  messageDelivered:
+    post:
+      tags:
+      - Message events
+      operationId: messageDelivered
+      summary: message.delivered
+      description: 'The provider confirmed delivery on a channel. For email this means accepted by the
+
+        recipient''s mail server; for push, accepted by APNs/FCM; for SMS, a carrier delivery receipt.
+
+        '
+      parameters:
+      - $ref: '#/components/parameters/Signature'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MessageEvent'
+            example:
+              id: evt_01J8X8C3D4
+              type: message.delivered
+              created_at: '2026-09-15T17:42:18Z'
+              data:
+                message_id: msg_01J8X5A7QZ
+                recipient_id: rcp_01J8X4K2M9
+                template_id: tpl_welcome_v3
+                channel: email
+                provider: pingme-email
+      responses:
+        '200':
+          description: Return any 2xx status to acknowledge receipt.
+  messageFailed:
+    post:
+      tags:
+      - Message events
+      operationId: messageFailed
+      summary: message.failed
+      description: Delivery on a channel failed after all retries. `data.error` explains why.
+      parameters:
+      - $ref: '#/components/parameters/Signature'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MessageFailedEvent'
+            example:
+              id: evt_01J8X8E5F6
+              type: message.failed
+              created_at: '2026-09-15T17:43:02Z'
+              data:
+                message_id: msg_01J8X5A7QZ
+                recipient_id: rcp_01J8X4K2M9
+                template_id: tpl_welcome_v3
+                channel: push
+                provider: apns
+                attempts: 3
+                error:
+                  code: device_token_invalid
+                  message: The device token was rejected by APNs.
+      responses:
+        '200':
+          description: Return any 2xx status to acknowledge receipt.
+components:
+  parameters:
+    Signature:
+      name: X-PingMe-Signature
+      in: header
+      required: true
+      schema:
+        type: string
+      example: 5257a869e7ecebeda32affa62cdca3fa51cad7e77a0e56ff536d0ce8e108d8bd
+      description: Hex HMAC-SHA256 of the raw request body using your signing secret.
+  schemas:
+    Channel:
+      type: string
+      enum:
+      - email
+      - sms
+      - push
+    MessageEvent:
+      type: object
+      required:
+      - id
+      - type
+      - created_at
+      - data
+      properties:
+        id:
+          type: string
+          description: Unique event ID (also sent as `PingMe-Event-Id`).
+        type:
+          type: string
+          enum:
+          - message.sent
+          - message.delivered
+        created_at:
+          type: string
+          format: date-time
+        data:
+          type: object
+          properties:
+            message_id:
+              type: string
+            recipient_id:
+              type: string
+            template_id:
+              type:
+              - string
+              - 'null'
+            channel:
+              $ref: '#/components/schemas/Channel'
+            provider:
+              type: string
+    MessageFailedEvent:
+      type: object
+      required:
+      - id
+      - type
+      - created_at
+      - data
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+          enum:
+          - message.failed
+        created_at:
+          type: string
+          format: date-time
+        data:
+          type: object
+          properties:
+            message_id:
+              type: string
+            recipient_id:
+              type: string
+            template_id:
+              type:
+              - string
+              - 'null'
+            channel:
+              $ref: '#/components/schemas/Channel'
+            provider:
+              type: string
+            attempts:
+              type: integer
+            error:
+              type: object
+              properties:
+                code:
+                  type: string
+                message:
+                  type: string

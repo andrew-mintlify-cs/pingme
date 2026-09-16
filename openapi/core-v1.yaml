@@ -1,0 +1,833 @@
+openapi: 3.1.0
+info:
+  title: PingMe Core API
+  version: 1.0.0
+  summary: Send email, SMS, push, in-app, and Slack notifications through one API.
+  description: 'The PingMe Core API lets you manage **recipients**, define reusable **templates**,
+
+    send **messages** across one or more channels, and inspect per-channel **deliveries**.
+
+
+    All requests use `https://api.pingme.dev/v1` and require a bearer API key.
+
+    Test keys (`pm_test_…`) never deliver to real recipients; live keys (`pm_live_…`) do.
+
+
+
+    **v1 is a legacy version.** New integrations should use v2, which adds multi-channel sends, scheduling, idempotency
+    keys, and per-channel preferences.
+
+    '
+  contact:
+    name: PingMe Support
+    email: support@pingme.dev
+    url: https://docs.pingme.dev
+  license:
+    name: Proprietary
+    url: https://pingme.dev/terms
+servers:
+- url: https://api.pingme.dev/v1
+  description: Production
+security:
+- bearerAuth: []
+tags:
+- name: Messages
+  description: Send notifications and track their status.
+- name: Recipients
+  description: The people you send notifications to.
+- name: Templates
+  description: Reusable message content with variables.
+- name: Webhook endpoints
+  description: URLs that PingMe calls when events happen. See the Webhook events reference for payloads.
+paths:
+  /messages:
+    post:
+      tags:
+      - Messages
+      operationId: sendMessage
+      summary: Send a message
+      description: 'Sends a notification to one recipient on a single channel. Provide either a `template_id` (with
+        `data`) or inline `content`.
+
+
+        Sends are asynchronous: the response returns immediately with `status: queued`. Track progress with **Get
+        message deliveries** or subscribe to webhook events.
+
+        '
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SendMessageRequest'
+            examples:
+              templated:
+                summary: Send a templated welcome email and push
+                value:
+                  recipient_id: rcp_01J8X4K2M9
+                  template_id: tpl_welcome_v3
+                  channel: email
+                  data:
+                    first_name: Priya
+                    workspace: Acme Analytics
+              inline:
+                summary: Send an inline SMS
+                value:
+                  recipient_id: rcp_01J8X4K2M9
+                  channel: sms
+                  content:
+                    body: Your verification code is 482913. It expires in 10 minutes.
+      responses:
+        '202':
+          description: Message accepted and queued for delivery.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Message'
+              example:
+                id: msg_01J8X5A7QZ
+                recipient_id: rcp_01J8X4K2M9
+                template_id: tpl_welcome_v3
+                status: queued
+                created_at: '2026-09-15T17:42:10Z'
+                channel: email
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+  /messages/{message_id}:
+    get:
+      tags:
+      - Messages
+      operationId: getMessage
+      summary: Get a message
+      description: Returns a message and its current aggregate status.
+      parameters:
+      - $ref: '#/components/parameters/MessageId'
+      responses:
+        '200':
+          description: The message.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Message'
+              example:
+                id: msg_01J8X5A7QZ
+                recipient_id: rcp_01J8X4K2M9
+                template_id: tpl_welcome_v3
+                status: delivered
+                created_at: '2026-09-15T17:42:10Z'
+                channel: email
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /messages/{message_id}/deliveries:
+    get:
+      tags:
+      - Messages
+      operationId: listDeliveries
+      summary: Get message deliveries
+      description: Returns one delivery record per channel the message was sent on.
+      parameters:
+      - $ref: '#/components/parameters/MessageId'
+      responses:
+        '200':
+          description: Delivery records for the message.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Delivery'
+              example:
+                data:
+                - message_id: msg_01J8X5A7QZ
+                  channel: email
+                  status: delivered
+                  provider: pingme-email
+                  attempts: 1
+                  error: null
+                  updated_at: '2026-09-15T17:42:18Z'
+                - message_id: msg_01J8X5A7QZ
+                  channel: push
+                  status: failed
+                  provider: apns
+                  attempts: 3
+                  error:
+                    code: device_token_invalid
+                    message: The device token was rejected by APNs.
+                  updated_at: '2026-09-15T17:43:02Z'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /recipients:
+    post:
+      tags:
+      - Recipients
+      operationId: createRecipient
+      summary: Create a recipient
+      description: 'Creates a recipient. Use `external_id` to store your own user ID so you can
+
+        look recipients up without keeping a mapping table.
+
+        '
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateRecipientRequest'
+            example:
+              external_id: user_8841
+              email: priya@acme-analytics.example
+              phone: '+14155550142'
+              locale: en-US
+              timezone: America/Los_Angeles
+              unsubscribed: false
+      responses:
+        '201':
+          description: The created recipient.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Recipient'
+              example:
+                id: rcp_01J8X4K2M9
+                external_id: user_8841
+                email: priya@acme-analytics.example
+                phone: '+14155550142'
+                locale: en-US
+                timezone: America/Los_Angeles
+                created_at: '2026-09-15T17:40:00Z'
+                unsubscribed: false
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /recipients/{recipient_id}:
+    get:
+      tags:
+      - Recipients
+      operationId: getRecipient
+      summary: Get a recipient
+      parameters:
+      - $ref: '#/components/parameters/RecipientId'
+      responses:
+        '200':
+          description: The recipient.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Recipient'
+              example:
+                id: rcp_01J8X4K2M9
+                external_id: user_8841
+                email: priya@acme-analytics.example
+                phone: '+14155550142'
+                locale: en-US
+                timezone: America/Los_Angeles
+                created_at: '2026-09-15T17:40:00Z'
+                unsubscribed: false
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags:
+      - Recipients
+      operationId: updateRecipient
+      summary: Update a recipient
+      description: Updates contact details or the `unsubscribed` flag.
+      parameters:
+      - $ref: '#/components/parameters/RecipientId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateRecipientRequest'
+            example:
+              unsubscribed: true
+      responses:
+        '200':
+          description: The updated recipient.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Recipient'
+              example:
+                id: rcp_01J8X4K2M9
+                external_id: user_8841
+                email: priya@acme-analytics.example
+                phone: '+14155550142'
+                locale: en-US
+                timezone: America/Los_Angeles
+                created_at: '2026-09-15T17:40:00Z'
+                unsubscribed: false
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /templates:
+    post:
+      tags:
+      - Templates
+      operationId: createTemplate
+      summary: Create a template
+      description: 'Creates a reusable template. Use `{{variable}}` placeholders in `subject` and `body`;
+
+        supply values in the `data` field when you send a message.
+
+        '
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTemplateRequest'
+            example:
+              name: welcome
+              channels:
+              - email
+              subject: Welcome to {{workspace}}, {{first_name}}!
+              body: Hi {{first_name}}, your workspace {{workspace}} is ready. Start by inviting your team.
+      responses:
+        '201':
+          description: The created template.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Template'
+              example:
+                id: tpl_welcome_v3
+                name: welcome
+                channels:
+                - email
+                subject: Welcome to {{workspace}}, {{first_name}}!
+                body: Hi {{first_name}}, your workspace {{workspace}} is ready. Start by inviting your team.
+                variables:
+                - first_name
+                - workspace
+                version: 3
+                created_at: '2026-08-02T09:12:44Z'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /templates/{template_id}:
+    get:
+      tags:
+      - Templates
+      operationId: getTemplate
+      summary: Get a template
+      parameters:
+      - name: template_id
+        in: path
+        required: true
+        schema:
+          type: string
+        example: tpl_welcome_v3
+      responses:
+        '200':
+          description: The template.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Template'
+              example:
+                id: tpl_welcome_v3
+                name: welcome
+                channels:
+                - email
+                subject: Welcome to {{workspace}}, {{first_name}}!
+                body: Hi {{first_name}}, your workspace {{workspace}} is ready. Start by inviting your team.
+                variables:
+                - first_name
+                - workspace
+                version: 3
+                created_at: '2026-08-02T09:12:44Z'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /webhooks:
+    post:
+      tags:
+      - Webhook endpoints
+      operationId: createWebhookEndpoint
+      summary: Create a webhook endpoint
+      description: 'Registers a URL to receive event notifications. The response includes a signing
+
+        `secret` **once** — store it securely and use it to verify the `X-PingMe-Signature` header.
+
+        '
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateWebhookEndpointRequest'
+            example:
+              url: https://api.acme-analytics.example/webhooks/pingme
+              events:
+              - message.delivered
+              - message.failed
+              description: Production delivery tracking
+      responses:
+        '201':
+          description: The created endpoint, including its signing secret.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebhookEndpoint'
+              example:
+                id: whk_01J8X7D3VN
+                url: https://api.acme-analytics.example/webhooks/pingme
+                events:
+                - message.delivered
+                - message.failed
+                description: Production delivery tracking
+                secret: whsec_9f1c2b7e4a6d8e0f1a2b3c4d5e6f7a8b
+                status: active
+                created_at: '2026-09-15T17:50:00Z'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    get:
+      tags:
+      - Webhook endpoints
+      operationId: listWebhookEndpoints
+      summary: List webhook endpoints
+      parameters:
+      - $ref: '#/components/parameters/Limit'
+      - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: A page of webhook endpoints. Secrets are never returned after creation.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/WebhookEndpoint'
+                  next_cursor:
+                    type:
+                    - string
+                    - 'null'
+                    description: Pass as `cursor` to fetch the next page. `null` when there are no more results.
+              example:
+                data:
+                - id: whk_01J8X7D3VN
+                  url: https://api.acme-analytics.example/webhooks/pingme
+                  events:
+                  - message.delivered
+                  - message.failed
+                  description: Production delivery tracking
+                  status: active
+                  created_at: '2026-09-15T17:50:00Z'
+                next_cursor: null
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: API key
+      description: 'Use `Authorization: Bearer pm_live_…` or `pm_test_…`. Create keys in the PingMe dashboard under
+        **Settings → API keys**.'
+  parameters:
+    MessageId:
+      name: message_id
+      in: path
+      required: true
+      schema:
+        type: string
+      example: msg_01J8X5A7QZ
+    RecipientId:
+      name: recipient_id
+      in: path
+      required: true
+      schema:
+        type: string
+      example: rcp_01J8X4K2M9
+    Limit:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+      description: Number of results per page.
+    Cursor:
+      name: cursor
+      in: query
+      schema:
+        type: string
+      description: Opaque cursor from a previous response's `next_cursor`.
+  schemas:
+    Channel:
+      type: string
+      enum:
+      - email
+      - sms
+      - push
+      description: A delivery channel.
+    MessageStatus:
+      type: string
+      enum:
+      - queued
+      - sent
+      - delivered
+      - failed
+      description: Aggregate status across all channels.
+    SendMessageRequest:
+      type: object
+      required:
+      - recipient_id
+      - channel
+      properties:
+        recipient_id:
+          type: string
+          description: The recipient to send to.
+          example: rcp_01J8X4K2M9
+        channel:
+          $ref: '#/components/schemas/Channel'
+          description: The single channel to deliver on.
+        template_id:
+          type: string
+          description: A template to render. Mutually exclusive with `content`.
+          example: tpl_welcome_v3
+        data:
+          type: object
+          additionalProperties: true
+          description: Values for template `{{variables}}`.
+        content:
+          type: object
+          description: Inline content, used when no `template_id` is given.
+          properties:
+            subject:
+              type: string
+              description: Subject line (email) or title (push, in-app).
+            body:
+              type: string
+              description: Message body. Plain text; use a template for rich content.
+    Message:
+      type: object
+      properties:
+        id:
+          type: string
+          example: msg_01J8X5A7QZ
+        recipient_id:
+          type: string
+        template_id:
+          type:
+          - string
+          - 'null'
+        status:
+          $ref: '#/components/schemas/MessageStatus'
+        created_at:
+          type: string
+          format: date-time
+        channel:
+          $ref: '#/components/schemas/Channel'
+    Delivery:
+      type: object
+      properties:
+        message_id:
+          type: string
+        channel:
+          $ref: '#/components/schemas/Channel'
+        status:
+          type: string
+          enum:
+          - queued
+          - sent
+          - delivered
+          - failed
+          - skipped
+        provider:
+          type: string
+          description: The downstream provider used, for example `apns`, `fcm`, `slack`, or `pingme-email`.
+        attempts:
+          type: integer
+        error:
+          type:
+          - object
+          - 'null'
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+        updated_at:
+          type: string
+          format: date-time
+    CreateRecipientRequest:
+      type: object
+      properties:
+        external_id:
+          type: string
+          description: Your own identifier for this user. Must be unique per workspace.
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
+          description: E.164 format, for example `+14155550142`.
+        locale:
+          type: string
+          example: en-US
+        timezone:
+          type: string
+          description: IANA time zone, used for quiet hours and scheduled sends.
+          example: America/Los_Angeles
+        unsubscribed:
+          type: boolean
+          description: When `true`, all sends to this recipient are skipped.
+          default: false
+    UpdateRecipientRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
+        locale:
+          type: string
+        timezone:
+          type: string
+        unsubscribed:
+          type: boolean
+          description: When `true`, all sends to this recipient are skipped.
+          default: false
+    Recipient:
+      type: object
+      properties:
+        id:
+          type: string
+          example: rcp_01J8X4K2M9
+        external_id:
+          type:
+          - string
+          - 'null'
+        email:
+          type:
+          - string
+          - 'null'
+        phone:
+          type:
+          - string
+          - 'null'
+        locale:
+          type: string
+        timezone:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        unsubscribed:
+          type: boolean
+          description: When `true`, all sends to this recipient are skipped.
+          default: false
+    CreateTemplateRequest:
+      type: object
+      required:
+      - name
+      - channels
+      - body
+      properties:
+        name:
+          type: string
+          description: Human-readable name. Creating a template with an existing name creates a new version.
+        channels:
+          type: array
+          items:
+            $ref: '#/components/schemas/Channel'
+        subject:
+          type: string
+          description: Used as the email subject and push/in-app title.
+        body:
+          type: string
+          description: Message body with `{{variable}}` placeholders.
+    Template:
+      type: object
+      properties:
+        id:
+          type: string
+          example: tpl_welcome_v3
+        name:
+          type: string
+        channels:
+          type: array
+          items:
+            $ref: '#/components/schemas/Channel'
+        subject:
+          type:
+          - string
+          - 'null'
+        body:
+          type: string
+        variables:
+          type: array
+          items:
+            type: string
+          description: Variable names detected in `subject` and `body`.
+        version:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+    CreateWebhookEndpointRequest:
+      type: object
+      required:
+      - url
+      - events
+      properties:
+        url:
+          type: string
+          format: uri
+          description: Must use HTTPS.
+        events:
+          type: array
+          minItems: 1
+          items:
+            type: string
+            enum:
+            - message.sent
+            - message.delivered
+            - message.failed
+        description:
+          type: string
+    WebhookEndpoint:
+      type: object
+      properties:
+        id:
+          type: string
+          example: whk_01J8X7D3VN
+        url:
+          type: string
+          format: uri
+        events:
+          type: array
+          items:
+            type: string
+        description:
+          type:
+          - string
+          - 'null'
+        secret:
+          type: string
+          description: Signing secret. Returned only in the create response.
+        status:
+          type: string
+          enum:
+          - active
+          - disabled
+        created_at:
+          type: string
+          format: date-time
+    Error:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            type:
+              type: string
+              enum:
+              - validation_error
+              - authentication_error
+              - not_found
+              - conflict
+              - rate_limited
+              - server_error
+            code:
+              type: string
+              description: A stable, machine-readable code.
+            message:
+              type: string
+              description: A human-readable explanation.
+            doc_url:
+              type: string
+              format: uri
+            param:
+              type:
+              - string
+              - 'null'
+              description: For validation errors, the offending field.
+  responses:
+    ValidationError:
+      description: The request was malformed or failed validation.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              type: validation_error
+              code: invalid_channel
+              message: '''fax'' is not a supported channel. Supported: email, sms, push.'
+              param: channels
+              doc_url: https://docs.pingme.dev/v1/errors-and-rate-limits#validation-error
+    Unauthorized:
+      description: The API key is missing, malformed, or revoked.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              type: authentication_error
+              code: invalid_api_key
+              message: The API key provided is invalid or has been revoked.
+              param: null
+              doc_url: https://docs.pingme.dev/v1/api-keys
+    NotFound:
+      description: No resource exists with that ID.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              type: not_found
+              code: resource_not_found
+              message: No recipient found with id 'rcp_doesnotexist'.
+              param: recipient_id
+              doc_url: https://docs.pingme.dev/v1/errors-and-rate-limits#not-found
+    RateLimited:
+      description: Too many requests. Check the `Retry-After` header.
+      headers:
+        Retry-After:
+          schema:
+            type: integer
+          description: Seconds to wait before retrying.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              type: rate_limited
+              code: rate_limit_exceeded
+              message: You have exceeded 60 requests per minute. Retry after 45 seconds.
+              param: null
+              doc_url: https://docs.pingme.dev/v1/errors-and-rate-limits#rate-limits
