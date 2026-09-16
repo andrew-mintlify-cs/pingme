@@ -27,18 +27,8 @@
     }
   },
   "contextual": {
-    "options": ["copy", "view", "chatgpt", "claude", "cursor", "mcp"]
+    "options": ["copy", "view", "chatgpt", "claude", "mcp"]
   },
-  "redirects": [
-    {
-      "source": "/v2/getting-started",
-      "destination": "/v2/quickstart"
-    },
-    {
-      "source": "/docs/:slug*",
-      "destination": "/:slug*"
-    }
-  ],
   "navigation": {
     "global": {
       "anchors": [
@@ -151,6 +141,10 @@
       }
     ]
   },
+  "redirects": [
+    { "source": "/v2/getting-started", "destination": "/v2/quickstart" },
+    { "source": "/docs/:slug*", "destination": "/:slug*" }
+  ],
   "navbar": {
     "links": [{ "label": "Sign in", "href": "https://app.pingme.dev/login" }],
     "primary": {

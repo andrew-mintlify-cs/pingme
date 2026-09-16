@@ -1,63 +1,59 @@
 ---
 title: "Docs style guide"
-description: "Internal — which Mintlify components PingMe uses, what each one looks like, and when to reach for it."
-icon: "palette"
+description: "Internal — every component the PingMe docs use, with the house rule for when to reach for it."
+icon: "swatchbook"
 hidden: true
 ---
 
 <Warning>
-  **Internal page.** This is the PingMe docs team's component reference. Every component below is rendered live so you can see exactly what readers see.
+  **Internal page.** This is the writing team's reference. It renders every component exactly as readers see it elsewhere on the site, so use it to preview a component before you put it on a public page.
 </Warning>
 
-Use the smallest component that does the job. Plain Markdown first; a component only when it changes how a reader moves through the page.
+Each section below shows one component, the rule for using it, and a live example with real PingMe content.
 
 ## Callouts
 
-One callout per section at most. If a page needs three warnings, the page is the problem.
+Five callouts, five different signals. Use at most one or two per screen — if every paragraph has a callout, none of them stand out.
 
 <Note>
-  **Note** — neutral context the reader can skip. *"Test keys never deliver to real recipients."*
+  **Note** — context that helps but is not required. Test keys (`pm_test_…`) appear in your logs tagged **Test**.
 </Note>
 
 <Tip>
-  **Tip** — a better way to do the thing they are already doing. *"Store your user ID in `external_id` so you can skip the lookup table."*
+  **Tip** — a shortcut or best practice. Build your `Idempotency-Key` from your own user ID so retries never send a duplicate.
 </Tip>
 
 <Info>
-  **Info** — a fact about scope or version. *"This guide uses API v2."*
+  **Info** — neutral background. Sends are asynchronous: the response returns `202 Accepted` with `status: queued`.
 </Info>
 
 <Warning>
-  **Warning** — something that costs money, data, or a live send if ignored. *"Never embed a live key in a mobile app."*
+  **Warning** — something that will cost the reader if ignored. The webhook signing `secret` is shown once. Store it before you leave the page.
 </Warning>
 
 <Check>
-  **Check** — confirmation that a step or the whole task worked. *"Deliveries move to `delivered` within a few seconds."*
+  **Check** — confirmation that a step worked. Deliveries move to `delivered` within a few seconds in the sandbox.
 </Check>
 
 ## Steps
 
-For ordered procedures where the reader does something at each step. Three to seven steps; if you have more, split the page.
+Use `Steps` for procedures the reader performs in order. Each step gets a verb-first title and, where possible, a way to verify it worked.
 
 <Steps>
   <Step title="Create a recipient">
-    One action per step, with the code that performs it directly beneath.
-
-    ```bash
-    curl https://api.pingme.dev/v2/recipients -H "Authorization: Bearer $PINGME_API_KEY" -d '{"email": "priya@acme-analytics.example"}'
-    ```
+    Store your user's ID in `external_id` so you can find them later without a lookup table.
   </Step>
   <Step title="Send a message">
-    Tell the reader what to expect in the response so they know the step worked.
+    Reference a template or pass inline `content`. The response includes a `msg_` ID.
   </Step>
-  <Step title="Check delivery">
-    End with the verification, not with the last mutation.
+  <Step title="Confirm delivery">
+    Poll `GET /messages/{id}/deliveries` or subscribe to the `message.delivered` webhook.
   </Step>
 </Steps>
 
 ## Code groups
 
-The same example in several languages. The reader picks a tab once and the choice sticks across the site.
+Use `CodeGroup` when the same example exists in more than one language. Write the explanation once; the reader picks their tab.
 
 <CodeGroup>
 ```bash curl
@@ -75,9 +71,9 @@ requests.post(f"{API}/messages", headers=HEADERS, json={
 ```
 
 ```typescript TypeScript
-await fetch(`${API}/messages`, {
+await fetch("https://api.pingme.dev/v2/messages", {
   method: "POST",
-  headers,
+  headers: { Authorization: `Bearer ${process.env.PINGME_API_KEY}` },
   body: JSON.stringify({ recipient_id: "rcp_01J8X4K2M9", channels: ["email"], template_id: "tpl_welcome_v3" }),
 });
 ```
@@ -85,39 +81,36 @@ await fetch(`${API}/messages`, {
 
 ## Tabs
 
-For prose that differs by platform, role, or scenario — not for code (use a code group). The reader already knows which tab applies to them.
+Use `Tabs` when the reader already knows which variant applies to them — a platform, a role, a plan. Unlike `CodeGroup`, tabs hold prose and components, not just code.
 
 <Tabs>
-  <Tab title="Happy path">
-    Your app calls PingMe, PingMe renders the template, each channel goes to its provider, and `message.delivered` events flow back to your webhook.
+  <Tab title="Email">
+    Delivered through PingMe's email gateway. Includes an unsubscribe link automatically.
   </Tab>
-  <Tab title="Channel fails">
-    PingMe retries transient errors, marks the channel `failed` with the provider's reason, and fires `message.failed` so you can fall back.
+  <Tab title="SMS">
+    Carrier delivery receipts drive the `delivered` status. STOP replies set the recipient's `sms` preference to `false`.
   </Tab>
-  <Tab title="User opts out">
-    Future sends on that channel are silently skipped, and `recipient.unsubscribed` lets you mirror the preference.
+  <Tab title="Push">
+    Requires a device token registered on the recipient. Invalid tokens fail with `device_token_invalid`.
   </Tab>
 </Tabs>
 
 ## Accordions
 
-Progressive disclosure for detail most readers do not need: FAQs, edge cases, long error tables.
+Use `Accordion` for detail most readers can skip — FAQs, edge cases, long error tables. The title must make sense on its own, because that is all most readers see.
 
 <AccordionGroup>
   <Accordion title="What happens if a channel fails?">
-    PingMe retries transient failures automatically. If a channel ultimately fails, the message's aggregate status becomes `partially_delivered` or `failed` and a `message.failed` webhook fires.
-  </Accordion>
-  <Accordion title="Is there a sandbox?">
-    Yes. Test API keys (`pm_test_…`) exercise the full API but never deliver to real recipients.
+    PingMe retries transient failures automatically. If the channel ultimately fails, the message becomes `partially_delivered` or `failed` and a `message.failed` event fires.
   </Accordion>
   <Accordion title="Can I cancel a scheduled message?">
-    Until it sends. `POST /messages/{id}/cancel` returns `409` once the message has been handed to a provider.
+    Yes, until it sends. `POST /messages/{id}/cancel` returns `409` once the message has left the `scheduled` state.
   </Accordion>
 </AccordionGroup>
 
-## Cards
+## Cards and columns
 
-Navigation, not content. A card should send the reader somewhere; if it only explains, use a paragraph.
+Use `Card` for navigation — each card is a destination with a one-line reason to go there. `CardGroup` sets the column count; `Columns` does the same for arbitrary content.
 
 <CardGroup cols={3}>
   <Card title="Quickstart" icon="rocket" href="/v2/quickstart">
@@ -131,36 +124,29 @@ Navigation, not content. A card should send the reader somewhere; if it only exp
   </Card>
 </CardGroup>
 
-## Columns
+## Frame
 
-Two or three short items compared side by side when a table would be too rigid.
+Use `Frame` for any image or diagram that deserves a caption. It centers the image and keeps it inside the content column.
 
-<Columns cols={2}>
-  <Card title="Build it yourself when…" icon="hammer">
-    One channel, low volume, no preference management.
-  </Card>
-  <Card title="Use a platform when…" icon="rocket">
-    Two or more channels, unsubscribe compliance, delivery visibility.
-  </Card>
-</Columns>
-
-## Frames
-
-Every image or diagram goes in a frame with a caption that states the takeaway, not the filename.
-
-<Frame caption="Your app talks to one API. PingMe handles rendering, routing, delivery, and reporting.">
-  <img src="/images/how-it-works.svg" alt="Diagram of a request flowing from an application through PingMe to five delivery channels." />
+<Frame caption="Your application sends one request; PingMe routes it to each channel and reports back through webhooks.">
+  <img src="/images/how-it-works.svg" alt="PingMe architecture diagram" />
 </Frame>
 
 ## Tables
 
-Plain Markdown tables for anything compared against consistent attributes. Left-align text, keep to five columns or fewer.
+Use a Markdown table when you are comparing several items against the same attributes. Keep cells short; if a cell needs a paragraph, the content wants an accordion instead.
 
-| Component | Reach for it when | Avoid it when |
-| :-- | :-- | :-- |
-| Callout | One sentence must not be missed | Every paragraph feels important |
-| Steps | The reader acts at each step | The list is just facts in order |
-| Code group | Same example, several languages | Examples differ in what they do |
-| Tabs | Prose differs by scenario | The content is code |
-| Accordion | Detail most readers skip | The content is required to proceed |
-| Card | Sending the reader somewhere | Explaining something in place |
+| Channel | Best for | Latency | Relative cost |
+| :-- | :-- | :-- | :-- |
+| Email | Receipts, digests, anything with detail | Minutes | Low |
+| SMS | Codes and urgent alerts | Seconds | High |
+| Push | Re-engagement when the app is installed | Seconds | Very low |
+| In-app | Activity feeds, non-urgent updates | Instant | Very low |
+| Slack | Team-facing operational alerts | Seconds | Low |
+
+## House rules
+
+- One idea per callout, one callout per idea.
+- Steps for procedures; numbered Markdown lists for things that are ordered but not performed.
+- Every code sample must run as written with only `PINGME_API_KEY` set.
+- Internal links are root-relative: `/v2/api-keys`, never the full domain.
