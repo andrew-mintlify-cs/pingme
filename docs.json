@@ -84,7 +84,7 @@
               },
               {
                 "group": "Integrations",
-                "pages": ["v2/integrations/slack"]
+                "pages": ["v2/integrations/slack", "v2/integrations/teams"]
               },
               {
                 "group": "API reference",
