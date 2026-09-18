@@ -1,0 +1,113 @@
+---
+title: "Microsoft Teams"
+description: "Connect a Microsoft Teams tenant and use Teams as a PingMe channel for team-facing alerts."
+icon: "microsoft"
+---
+
+Teams is a first-class PingMe channel. Once connected, you send to Teams exactly the way you send email or push — same endpoint, same templates — which makes it easy to notify your own team about things happening to your users.
+
+## How it fits
+
+Most teams use Teams for **internal** notifications that complement user-facing ones:
+
+| User-facing send | Team-facing Teams send |
+| :-- | :-- |
+| Welcome email to a new enterprise sign-up | `Sales` channel alert: "Acme Analytics (plan: Enterprise trial) just signed up" |
+| Password reset SMS | `Security` channel alert if more than 5 resets in an hour |
+| Payment receipt email | `Finance` channel digest of the day's invoices |
+
+A recipient in PingMe can therefore be a *Teams channel* rather than a person.
+
+## Connect Teams
+
+<Steps>
+  <Step title="Install the PingMe app">
+    In the dashboard, go to **Settings → Channels → Teams** and click **Connect**. You'll be taken to Microsoft to authorize the app. You need permission to install apps in your Teams tenant, or a Teams admin to approve the request.
+  </Step>
+  <Step title="Choose channels">
+    Select which Teams channels PingMe may post to. You can add more later. Private channels require you to add @PingMe as a member in Teams first.
+  </Step>
+  <Step title="Note the channel IDs">
+    Each connected channel shows its Teams channel ID (like `19:abc123@thread.tacv2`). You'll use these as the `teams_channel` when creating recipients.
+  </Step>
+</Steps>
+
+## Create a recipient for a Teams channel
+
+Endpoint: [Create a recipient](/v2/api-reference/recipients/create-a-recipient)
+
+<CodeGroup>
+```bash curl
+curl https://api.pingme.dev/v2/recipients \
+  -H "Authorization: Bearer $PINGME_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "external_id": "teams-sales-alerts",
+    "teams_channel": "19:abc123@thread.tacv2",
+    "timezone": "America/New_York",
+    "preferences": { "teams": true, "email": false, "sms": false, "push": false }
+  }'
+```
+
+```python Python
+sales_channel = requests.post(f"{API}/recipients", headers=HEADERS, json={
+    "external_id": "teams-sales-alerts",
+    "teams_channel": "19:abc123@thread.tacv2",
+    "timezone": "America/New_York",
+    "preferences": {"teams": True, "email": False, "sms": False, "push": False},
+}).json()
+```
+</CodeGroup>
+
+<Note>
+  `teams_channel` is accepted on recipients once Teams is connected. Set the other channel preferences to `false` so a template that also lists `email` won't attempt to email a Teams channel.
+</Note>
+
+## Send to Teams
+
+Create a template that includes `teams` in its channels, then send as usual.
+
+Endpoint: [Send a message](/v2/api-reference/messages/send-a-message)
+
+<CodeGroup>
+```bash curl
+curl https://api.pingme.dev/v2/messages \
+  -H "Authorization: Bearer $PINGME_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "recipient_id": "rcp_01J8XA9SLK",
+    "channels": ["teams"],
+    "content": {
+      "subject": "New enterprise sign-up",
+      "body": "**Acme Analytics** just started an Enterprise trial. Owner: priya@acme-analytics.example"
+    }
+  }'
+```
+
+```python Python
+requests.post(f"{API}/messages", headers=HEADERS, json={
+    "recipient_id": sales_channel["id"],
+    "channels": ["teams"],
+    "content": {
+        "subject": "New enterprise sign-up",
+        "body": f"**{user.workspace_name}** just started an Enterprise trial. Owner: {user.email}",
+    },
+})
+```
+</CodeGroup>
+
+Teams messages support Teams' Adaptive Card markdown subset (`**bold**`, `_italic_`, `[links](https://…)`). The `subject` is rendered as a bold first line.
+
+## Delivery and errors
+
+Teams deliveries appear in [Get message deliveries](/v2/api-reference/messages/get-message-deliveries) with `provider: teams`. Common failure codes:
+
+| `error.code` | Meaning | Fix |
+| :-- | :-- | :-- |
+| `channel_not_found` | The channel ID is wrong or PingMe was removed from it | Re-check the ID in **Settings → Channels → Teams** |
+| `not_a_member` | Private channel without the app added | Add @PingMe as a member in Teams |
+| `teams_rate_limited` | Microsoft throttled the tenant | PingMe retries automatically; spread bursts with `scheduled_at` |
+
+## Disconnect
+
+Removing the PingMe app from Teams (or clicking **Disconnect** in the dashboard) immediately marks all Teams deliveries as `skipped`. Recipients and templates are unaffected, so reconnecting restores sends without code changes.
