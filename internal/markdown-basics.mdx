@@ -1,0 +1,28 @@
+---
+title: "Markdown basics"
+description: "Reference page showing the core Markdown elements PingMe docs use."
+hidden: true
+noindex: true
+---
+
+## Sending a message
+
+- Create a client with your API key
+- Call `client.send()` with a recipient and message
+- Check the response for a delivery status
+
+Every request needs a valid key — generate one on the [API keys](/v2/api-keys) page.
+
+```python
+from pingme import Client
+client = Client(api_key="pm_live_...")
+client.send(to="+15551234567", message="Hello!")
+```
+
+| Field     | Type   | Description               |
+| --------- | ------ | -------------------------- |
+| `to`      | string | Recipient phone number     |
+| `message` | string | Message body text          |
+| `id`      | string | Unique message identifier  |
+
+<img src="/images/how-it-works.svg" alt="PingMe message flow" />
